@@ -119,7 +119,7 @@ version = "0.15.0"
 deps = ["LinearAlgebra"]
 git-tree-sha1 = "10253bba596419e45fb2c745e86561b71d698548"
 repo-rev = "master"
-repo-url = "git@github.com:SebastianAment/LazyInverse.jl.git"
+repo-url = "https://github.com/SebastianAment/LazyInverse.jl.git"
 uuid = "d0afe1cb-6484-4949-b9e9-61bc645ed6c7"
 version = "0.1.0"
 
@@ -135,9 +135,9 @@ uuid = "37e2e46d-f89d-539d-b4ee-838fcccc9c8e"
 
 [[LinearAlgebraExtensions]]
 deps = ["FFTW", "InfiniteArrays", "LazyArrays", "LazyInverse", "LinearAlgebra", "StatsBase", "Test"]
-git-tree-sha1 = "fa35ab1546371ef1b47a64bbe04606b87640d844"
+git-tree-sha1 = "b6e7f4b479997387ba75ca2762c7f97866a35eb7"
 repo-rev = "master"
-repo-url = "git@github.com:SebastianAment/LinearAlgebraExtensions.jl.git"
+repo-url = "https://github.com/SebastianAment/LinearAlgebraExtensions.jl.git"
 uuid = "cb114d4a-f1bd-499c-ad9e-7f2ed74575b9"
 version = "0.1.0"
 
@@ -164,7 +164,7 @@ uuid = "d6f4376e-aef5-505a-96c1-9c027394607a"
 deps = ["ForwardDiff", "LazyInverse", "LinearAlgebra", "LinearAlgebraExtensions", "Test"]
 git-tree-sha1 = "6bcb93c5d6e301bf1da8221fdcd1ce38cc33b6f7"
 repo-rev = "master"
-repo-url = "git@github.com:SebastianAment/Metrics.jl.git"
+repo-url = "https://github.com/SebastianAment/Metrics.jl.git"
 uuid = "c142dcad-aa7a-4cb0-9847-771ddcebca7d"
 version = "0.1.0"
 
@@ -181,9 +181,9 @@ version = "0.3.3"
 
 [[OpenSpecFun_jll]]
 deps = ["CompilerSupportLibraries_jll", "Libdl", "Pkg"]
-git-tree-sha1 = "d110040968b9afe95c6bd9c6233570b0fe8abd22"
+git-tree-sha1 = "d51c416559217d974a1113522d5919235ae67a87"
 uuid = "efe28fd5-8261-553b-a9e1-b2916fc3738e"
-version = "0.5.3+2"
+version = "0.5.3+3"
 
 [[OrderedCollections]]
 deps = ["Random", "Serialization", "Test"]
