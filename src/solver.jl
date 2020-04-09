@@ -1,35 +1,52 @@
 using ToeplitzMatrices: Circulant, SymmetricToeplitz
 using SparseArrays
 using LinearAlgebra
-include("Kernel.jl")
-using .Kernel
+using IterativeSolvers
+using Kernel
 
 
-struct EmbededToeplitz{T,S} <: AbstractMatrix{T}
+struct EmbeddedToeplitz{T,S} <: AbstractMatrix{T}
     C::Circulant{T,S}
 end
 
+EmbeddedToeplitz(v) = EmbeddedToeplitz(Circulant([v; v[end-1:-1:2]]))
+
+# Computes ABα + Cβ, writing over C
+function mul!(c, A::EmbeddedToeplitz, b)
+    z = zeros(size(A.C, 1))
+    z2 = zeros(size(A.C, 1))
+    @views z[1:size(A, 1), :] .= b
+    mul!(z2, A.C, z)
+    @views c .= z2[1:size(A, 1)]
+    return c
+end
+
+function size(A::EmbeddedToeplitz) 
+    n = (size(A.C, 1) + 2) ÷ 2
+    return n, n
+end
+
+getindex(A::EmbeddedToeplitz, args...) = getindex(A.C, args...)
+
 # Represents (W)(Ku)(W^T) + D
 struct StructuredKernelInterpolant{T,S} <: Factorization{T}
-    Ku::EmbededToeplitz{T,S}
+    Ku::EmbeddedToeplitz{T,S}
     W::SparseMatrixCSC{T,Int}
     d::Vector{T}
 end
 
-# Constructs the Circulant matrix out of a kernel and a given range of points to
-# grid
-function ip_grid(k, grid)
-    G = gramian(k, grid)
-    v = G[1, :]
-    v′ = [v:v[end - 1:-1:2]]
-    return Circulant(v')
+function mul!(c, S::StructuredKernelInterpolant, x)
+    c .= S.W * (S.Ku * (S.W' * x)) .+ S.d .* x
+    return nothing
 end
 
 # k is kernel, x is a vector of data, and m is the number of grid points
 function structured_kernel_interpolant(k, x, m)
-    Ku = ip_grid(k, range(min(x), max(x), length = m))
-    W = Matrix(I, size(Ku)...)
-    d = diag(gramian(k, x))
+    G = Kernel.gramian(k, range(minimum(x), maximum(x), length = m))
+    v = G[1, :]
+    Ku = EmbeddedToeplitz(v)
+    W = SparseMatrixCSC{Float64, Int}(I, size(Ku)...)
+    d = diag(Kernel.gramian(k, x))
     for i in 1:length(x)
         d[i] -= W[:, i]' * (Ku * (W[:, i]))
     end
@@ -39,10 +56,13 @@ end
 # Gives dimension for the given n x n matrix. Outputs a tuple of the dimensions
 # of the matrix. 
 size(S::StructuredKernelInterpolant) = length(S.d), length(S.d)
+size(S::StructuredKernelInterpolant, d) = length(S.d) # TODO bounds check
 
 # Left division. Equivalent to (S^-1)b. Overwrites b. Returns nothing
 function ldiv!(S::StructuredKernelInterpolant, b)
-    # TODO
+    x = similar(b)
+    cg!(x, S, b)
+    b .= x
     return nothing
 end
 
