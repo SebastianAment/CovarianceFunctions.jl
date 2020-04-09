@@ -35,6 +35,40 @@ struct StructuredKernelInterpolant{T,S} <: Factorization{T}
     d::Vector{T}
 end
 
+#####
+##### Construction - based on Local Quntic Interpolation
+##### Fast SKI diagonal construction
+##### and Eric Hans Lee's MATLAB code GP_Derivatives
+#####
+
+function interp_grid()
+end
+
+function _select_gridpoints(x, grid) 
+    stepsize = grid[2] - grid[1]
+    J = floor(Int, (x - grid[1]) / stepsize)
+    idx = collect(J-2:J+3) # TODO - Ask Eric if this should be J-1:J+4
+    return idx, @views _lq_interp.((x .- grid[idx]) ./ stepsize)
+end
+
+# Local Quintic Interpolation
+# Key's Cubic Convolution Interpolation Function
+function _lq_interp(x)
+    x′ = abs(x)
+    q = if x′ <= 1
+        ((( -0.84375 * x′ + 1.96875) * x′ ^ 2) - 2.125) .* x .^ 2 + 1
+    elseif x′ <= 2
+        term1 = (0.203125 * x′ - 1.3125) * x′ + 2.65625
+        (term1 * x′ - 0.875) * x′ - 2.578125) * x′ + 1.90625
+    elseif x′ <= 3
+        term2 = (0.046875 * x′ - 0.65625) * x′ + 3.65625
+        ((term2 * x′ - 10.125) * x′ + 13.921875) * x′ - 7.59375
+    else
+        0
+    end
+    return q
+end
+
 function mul!(c, S::StructuredKernelInterpolant, x)
     c .= S.W * (S.Ku * (S.W' * x)) .+ S.d .* x
     return nothing
