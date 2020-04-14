@@ -9,7 +9,7 @@ struct EmbeddedToeplitz{T,S} <: AbstractMatrix{T}
     C::Circulant{T,S}
 end
 
-EmbeddedToeplitz(v) = EmbeddedToeplitz(Circulant([v; v[end-1:-1:2]]))
+EmbeddedToeplitz(v) = @views EmbeddedToeplitz(Circulant([v; v[end-1:-1:2]]))
 
 # Computes ABα + Cβ, writing over C
 function mul!(c, A::EmbeddedToeplitz, b)
@@ -59,7 +59,7 @@ function _lq_interp(x)
         ((( -0.84375 * x′ + 1.96875) * x′ ^ 2) - 2.125) .* x .^ 2 + 1
     elseif x′ <= 2
         term1 = (0.203125 * x′ - 1.3125) * x′ + 2.65625
-        (term1 * x′ - 0.875) * x′ - 2.578125) * x′ + 1.90625
+        ((term1 * x′ - 0.875) * x′ - 2.578125) * x′ + 1.90625
     elseif x′ <= 3
         term2 = (0.046875 * x′ - 0.65625) * x′ + 3.65625
         ((term2 * x′ - 10.125) * x′ + 13.921875) * x′ - 7.59375
@@ -107,6 +107,37 @@ det(S::StructuredKernelInterpolant) = exp(logdet(S))
 function logdet(S::StructuredKernelInterpolant)
     # TODO
     return 1
+end
+
+
+function lanczos_arpack(A, k, v; maxiter, tol)
+    T = eltype(A)
+    n = size(A, 1)
+    mulA! = (y, x) -> mul!(y, A, x) 
+    id = x -> x
+    # in: (T, mulA!, mulB, solveSI, n, issym, iscmplx, bmat,
+    #            nev, ncv, whichstr, tol, maxiter, mode, v0)
+    # out: (resid, v, ldv, iparam, ipntr, workd, workl, lworkl, rwork, TOL)
+    out = Arpack.aupd_wrapper(T, mulA!, id, id, n, true, false, "I",
+                       1, k, "LM", tol, maxiter, 1, v)
+
+    α = out[7][k+1:2*k-1]
+    β = out[7][2:k-1]
+    
+    return out[2], α, β, out[1]
+end
+
+function _lanczos_logdet!(z, acc, A, k; maxiter, tol, nsamples)
+    for i in 1:nsamples
+        rand!(Normal(), z)
+        z .= sign.(z)
+        Q, α, β, resid = lanczos_arpack(A, k, z; maxiter=maxiter, tol=tol)
+        T = SymTridiagonal(α, β)
+        Λ = eigen(T)
+        wts = Λ.vectors[1, :] .^ 2 .* norm(z) ^ 2
+        acc += dot(wts, log.(Λ.values))
+    end
+    return acc / nsamples
 end
 
 # Returns the inverse of the matrix S. 
