@@ -41,18 +41,26 @@ end
 ##### and Eric Hans Lee's MATLAB code GP_Derivatives
 #####
 
+# n is number of training points, N is number of grid points
 function interp_grid(train_pts, grid_pts)
     n, d = size(train_pts)
     N = length(grid_pts)
-    sel_pts, wt = _select_gridpoints(train_pts, grid_pts)
-
+    sel_pts, wt = _select_gridpoints!(zeros(n, 6), zeros(n, 6), train_pts, grid_pts)
+    W = spzeros(n, N)
+    for i in 1:6
+        for j in 1:n
+            W[j, sel_pts[j, i]] = wt[j, i]
+        end
+    end
+    return W
 end
 
-function _select_gridpoints(train_vector, grid) 
+function _select_gridpoints!(idx, wt, train_vector, grid) 
     stepsize = grid[2] - grid[1]
-    J = floor.(Int, (train_vector .- grid[1]) ./ stepsize)
-    idx = collect.(J .- 2:J .+ 3) # TODO - Ask Eric if this should be J-1:J+4
-    return idx, @views _lq_interp.((train_vector .- grid[idx]) ./ stepsize)
+    idx .= floor.(Int, (train_vector .- grid[1]) ./ stepsize)
+    idx .+= [-2 -1 0 1 2 3]
+    wt .= @views _lq_interp.((train_vector .- grid[:, idx]) ./ stepsize)
+    return idx, wt
 end
 
 # Local Quintic Interpolation
@@ -60,7 +68,7 @@ end
 function _lq_interp(x)
     x′ = abs(x)
     q = if x′ <= 1
-        ((( -0.84375 * x′ + 1.96875) * x′^2) - 2.125) .* x.^2 + 1
+        ((( -0.84375 * x′ + 1.96875) * x′^2) - 2.125) * x.^2 + 1
     elseif x′ <= 2
         term1 = (0.203125 * x′ - 1.3125) * x′ + 2.65625
         ((term1 * x′ - 0.875) * x′ - 2.578125) * x′ + 1.90625
