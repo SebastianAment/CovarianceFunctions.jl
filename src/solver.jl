@@ -3,7 +3,7 @@ using SparseArrays
 using LinearAlgebra
 using IterativeSolvers
 using Kernel
-
+import Base: size
 
 struct EmbeddedToeplitz{T,S} <: AbstractMatrix{T}
     C::Circulant{T,S}
@@ -43,9 +43,9 @@ end
 
 # n is number of training points, N is number of grid points
 function interp_grid(train_pts, grid_pts)
-    n, d = size(train_pts)
+    n = size(train_pts, 1)
     N = length(grid_pts)
-    sel_pts, wt = _select_gridpoints!(zeros(n, 6), zeros(n, 6), train_pts, grid_pts)
+    sel_pts, wt = _select_gridpoints!(zeros(Int, n, 6), zeros(n, 6), train_pts, grid_pts)
     W = spzeros(n, N)
     for i in 1:6
         for j in 1:n
@@ -59,7 +59,8 @@ function _select_gridpoints!(idx, wt, train_vector, grid)
     stepsize = grid[2] - grid[1]
     idx .= floor.(Int, (train_vector .- grid[1]) ./ stepsize)
     idx .+= [-2 -1 0 1 2 3]
-    wt .= @views _lq_interp.((train_vector .- grid[:, idx]) ./ stepsize)
+    display(idx)
+    wt .= @views _lq_interp.((train_vector .- grid[idx]) ./ stepsize)
     return idx, wt
 end
 
