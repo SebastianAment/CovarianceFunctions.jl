@@ -43,7 +43,7 @@ end
 
 # n is number of training points, N is number of grid points
 function interp_grid(train_pts, grid_pts)
-    n = size(train_pts)
+    n = size(train_pts, 1)
     N = length(grid_pts)
     sel_pts, wt = _select_gridpoints!(zeros(n, 6), zeros(n, 6), train_pts, grid_pts)
     W = spzeros(n, N)
