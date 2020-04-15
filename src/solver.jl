@@ -9,7 +9,7 @@ struct EmbeddedToeplitz{T,S} <: AbstractMatrix{T}
     C::Circulant{T,S}
 end
 
-EmbeddedToeplitz(v) = @views EmbeddedToeplitz(Circulant([v; v[end-1:-1:2]]))
+EmbeddedToeplitz(v) = @views EmbeddedToeplitz(Circulant([v; v[end - 1:-1:2]]))
 
 # Computes ABα + Cβ, writing over C
 function mul!(c, A::EmbeddedToeplitz, b)
@@ -41,14 +41,18 @@ end
 ##### and Eric Hans Lee's MATLAB code GP_Derivatives
 #####
 
-function interp_grid()
+function interp_grid(train_pts, grid_pts)
+    n, d = size(train_pts)
+    N = length(grid_pts)
+    sel_pts, wt = _select_gridpoints(train_pts, grid_pts)
+
 end
 
-function _select_gridpoints(x, grid) 
+function _select_gridpoints(train_vector, grid) 
     stepsize = grid[2] - grid[1]
-    J = floor(Int, (x - grid[1]) / stepsize)
-    idx = collect(J-2:J+3) # TODO - Ask Eric if this should be J-1:J+4
-    return idx, @views _lq_interp.((x .- grid[idx]) ./ stepsize)
+    J = floor.(Int, (train_vector .- grid[1]) ./ stepsize)
+    idx = collect.(J .- 2:J .+ 3) # TODO - Ask Eric if this should be J-1:J+4
+    return idx, @views _lq_interp.((train_vector .- grid[idx]) ./ stepsize)
 end
 
 # Local Quintic Interpolation
@@ -56,7 +60,7 @@ end
 function _lq_interp(x)
     x′ = abs(x)
     q = if x′ <= 1
-        ((( -0.84375 * x′ + 1.96875) * x′ ^ 2) - 2.125) .* x .^ 2 + 1
+        ((( -0.84375 * x′ + 1.96875) * x′^2) - 2.125) .* x.^2 + 1
     elseif x′ <= 2
         term1 = (0.203125 * x′ - 1.3125) * x′ + 2.65625
         ((term1 * x′ - 0.875) * x′ - 2.578125) * x′ + 1.90625
@@ -79,7 +83,7 @@ function structured_kernel_interpolant(k, x, m)
     G = Kernel.gramian(k, range(minimum(x), maximum(x), length = m))
     v = G[1, :]
     Ku = EmbeddedToeplitz(v)
-    W = SparseMatrixCSC{Float64, Int}(I, size(Ku)...)
+    W = SparseMatrixCSC{Float64,Int}(I, size(Ku)...)
     d = diag(Kernel.gramian(k, x))
     for i in 1:length(x)
         d[i] -= W[:, i]' * (Ku * (W[:, i]))
@@ -113,16 +117,16 @@ end
 function lanczos_arpack(A, k, v; maxiter, tol)
     T = eltype(A)
     n = size(A, 1)
-    mulA! = (y, x) -> mul!(y, A, x) 
-    id = x -> x
+    mulA! = (y, x)->mul!(y, A, x) 
+    id = x->x
     # in: (T, mulA!, mulB, solveSI, n, issym, iscmplx, bmat,
     #            nev, ncv, whichstr, tol, maxiter, mode, v0)
     # out: (resid, v, ldv, iparam, ipntr, workd, workl, lworkl, rwork, TOL)
     out = Arpack.aupd_wrapper(T, mulA!, id, id, n, true, false, "I",
                        1, k, "LM", tol, maxiter, 1, v)
 
-    α = out[7][k+1:2*k-1]
-    β = out[7][2:k-1]
+    α = out[7][k + 1:2 * k - 1]
+    β = out[7][2:k - 1]
     
     return out[2], α, β, out[1]
 end
@@ -131,10 +135,10 @@ function _lanczos_logdet!(z, acc, A, k; maxiter, tol, nsamples)
     for i in 1:nsamples
         rand!(Normal(), z)
         z .= sign.(z)
-        Q, α, β, resid = lanczos_arpack(A, k, z; maxiter=maxiter, tol=tol)
+        Q, α, β, resid = lanczos_arpack(A, k, z; maxiter = maxiter, tol = tol)
         T = SymTridiagonal(α, β)
         Λ = eigen(T)
-        wts = Λ.vectors[1, :] .^ 2 .* norm(z) ^ 2
+        wts = Λ.vectors[1, :].^2 .* norm(z)^2
         acc += dot(wts, log.(Λ.values))
     end
     return acc / nsamples
