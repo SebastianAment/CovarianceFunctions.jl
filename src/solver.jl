@@ -49,7 +49,7 @@ function interp_grid(train_pts, grid_pts)
     W = spzeros(n, N)
     for i in 1:6
         for j in 1:n
-            W[j, sel_pts[j, i]] = wt[j, i]
+            W[j, sel_pts[j, i]] = (wt[j, i] == 0 ? eps() * 10^3 : wt[j, i])
         end
     end
     return W
