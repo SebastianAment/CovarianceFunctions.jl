@@ -59,7 +59,6 @@ function _select_gridpoints!(idx, wt, train_vector, grid)
     stepsize = grid[2] - grid[1]
     idx .= floor.(Int, (train_vector .- grid[1]) ./ stepsize)
     idx .+= [-2 -1 0 1 2 3]
-    display(idx)
     wt .= @views _lq_interp.((train_vector .- grid[idx]) ./ stepsize)
     return idx, wt
 end
