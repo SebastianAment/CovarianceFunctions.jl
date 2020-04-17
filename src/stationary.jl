@@ -175,8 +175,7 @@ end
 ########################### Change of Input Norm  ##############################
 # apply a different norm to input radius r of a stationary kernel
 # special case of input transformation functional
-# IsotropicKernel?
-struct Normed{T, K<:IsotropicKernel{T}, N<:Metrics.Norm} <: StationaryKernel{T}
+struct Normed{T, K<:IsotropicKernel{T}, N} <: StationaryKernel{T}
     k::K
     n::N # norm for r call
 end
