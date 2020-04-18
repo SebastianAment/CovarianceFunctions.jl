@@ -13,6 +13,18 @@ using LinearAlgebra
     end
 end
 
+@testset "mercer" begin
+    using Kernel: FiniteBasis, gramian, Gramian
+    using LinearAlgebraExtensions: LowRank
+
+    basis = [sin, cos, identity]
+    k = FiniteBasis(basis)
+    @test k isa FiniteBasis
+    @test gramian(k, randn(16)) isa LowRank
+    @test gramian(k, randn(2)) isa Gramian # if # of functions is larger than data
+    # FiniteBasis([]) # throws
+end
+
 # @testset "Mercer Kernels" begin
 #     k = [Dot, Poly, NN]
 #     @test

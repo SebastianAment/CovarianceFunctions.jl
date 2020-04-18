@@ -29,8 +29,12 @@ struct Brownian{T} <: MercerKernel{T} end
 # finite basis function (linear regression) kernel,
 struct FiniteBasis{T, B<:Union{AbstractVector, Tuple}} <: MercerKernel{T}
     basis::B # tuple of vector of functions
+    function FiniteBasis{T}(basis) where {T}
+        length(basis) ≥ 1 || throw("basis is empty: length(basis) = $(length(basis))")
+        new{T, typeof(basis)}(basis)
+    end
 end
-FiniteBasis{T}(basis) where T = FiniteBasis{T, typeof(basis)}(basis)
+# FiniteBasis{T}(basis) where T = FiniteBasis{T, typeof(basis)}(basis)
 FiniteBasis(basis) = FiniteBasis{Float64}(basis)
 function (k::FiniteBasis)(x, y)
     v = zero(eltype(k))
