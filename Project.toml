@@ -4,6 +4,7 @@ authors = ["sebastianament "]
 version = "0.1.0"
 
 [deps]
+Distributions = "31c24e10-a181-5473-b8eb-7969acd0382f"
 ForwardDiff = "f6369f11-7733-5829-9624-2563aa707210"
 IterativeSolvers = "42fd0dbc-a981-5370-80f2-aaf504508153"
 LazyInverse = "d0afe1cb-6484-4949-b9e9-61bc645ed6c7"
