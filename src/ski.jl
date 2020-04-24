@@ -3,6 +3,7 @@ using SparseArrays
 using LinearAlgebra
 using IterativeSolvers
 using Kernel
+using Distributions
 import Base: size
 
 struct EmbeddedToeplitz{T,S} <: AbstractMatrix{T}
@@ -159,3 +160,24 @@ inv(S::StructuredKernelInterpolant) = ldiv!(S, Matrix(I, size(S)...))
 function isposdef(S::StructuredKernelInterpolant)
     return det(S) > 0
 end
+
+
+# Based on Sebastian Ament's algebra.jl file
+struct rand_add_proj{T,K <: Tuple{Vararg{MercerKernel}}} <: MercerKernel{T}
+    args::K # kernel for input covariances
+    weights::Matrix{Float64}
+    function rand_add_proj(k::Tuple{Vararg{MercerKernel}}, dataDim)
+        weights = rand(Normal(), length(k), dataDim)
+        T = promote_type(eltype.(k)...)
+        new{T,typeof(k)}(k, weights)
+    end
+end
+
+function (K::rand_add_proj)(x, x')
+    val = zero(eltype(K))
+    for (i, k) in enumerate(K.args)
+        val += k((K.weights[i] * x), (K.weights[i] * x'))
+    end
+    return val
+end
+
