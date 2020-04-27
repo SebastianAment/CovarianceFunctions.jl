@@ -5,22 +5,77 @@ using LinearAlgebra
 using LinearAlgebraExtensions: LowRank
 
 using Kernel
-using Kernel: MercerKernel, StationaryKernel, isstationary
+using Kernel: MercerKernel, StationaryKernel, isstationary, isisotropic
 using Kernel: Constant, EQ, RQ, Exp, γExp, Delta, Cosine, MaternP, Matern#, SM
 using Kernel: iscov
 
-k_strings = ["Exponentiated Quadratic", "Exponential", "δ",
+using Metrics
+const euclidean = Metrics.EuclideanNorm()
+
+####################### randomized stationarity tests ##########################
+# WARNING this test only allows for euclidean isotropy ...
+# does not matter for 1d tests
+function Kernel.isisotropic(k::MercerKernel, x::AbstractVector)
+    isiso = false
+    if isstationary(k)
+        isiso = true
+        r = euclidean(x[1]-x[2])
+        println(r)
+        kxr = k(x_i/r, x_j/r)
+        for x_i in x, x_j in x
+            r = euclidean(x_i-x_j)
+            val = k(x_i/r, x_j/r)
+            if !(kxr ≈ val)
+                isiso = false
+            end
+        end
+    end
+    return isiso
+end
+
+# tests if k is stationary on finite set of points x
+# need to make this multidimensional
+function Kernel.isstationary(k::MercerKernel, x::AbstractVector)
+    n = length(x)
+    d = length(x[1])
+    is_stationary = true
+    for i in 1:n, j in 1:n
+        ε = eltype(x) <: AbstractArray ? randn(d) : randn()
+        iseq = k(x[i], x[j]) ≈ k(x[i]+ε, x[j]+ε)
+        if !iseq
+            println(i ,j)
+            println(x[i], x[j])
+            println(k(x[i], x[j]) - k(x[i]+ε, x[j]+ε))
+            is_stationary = false
+            break
+        end
+    end
+    K = typeof(k)
+    if !is_stationary && (K <: StationaryKernel)
+        println("Covariance function " * string(K) * " is non-stationary but is subtype of StationaryKernel.")
+        return false
+    end
+
+    # if the kernel seems stationary but isn't a subtype of stationary kernel, suggest making it one
+    if is_stationary && !(K <: StationaryKernel)
+        println("Covariance function " * string(K) * " seems to be stationary. Consider making it a subtype of StationaryKernel.")
+        return false
+    end
+    return is_stationary
+end
+
+const k_strings = ["Exponentiated Quadratic", "Exponential", "δ",
             "Constant", "Rational Quadratic",
             "γ-Exponential", "Cosine",
             "Matern"]#, "Spectral Mixture"]
 
 r = 2*rand()
-k_arr = [EQ(), Exp(), Delta(),
+const k_arr = [EQ(), Exp(), Delta(),
         Constant(r), RQ(r),
         γExp(r), Cosine(r),
         Matern(r)]#, SM]
 
-tol = 1e-12
+const tol = 1e-12
 
 # TODO:
 # test higher input dimensions
@@ -48,7 +103,7 @@ tol = 1e-12
             @test isstationary(k, x)
         end
         # testing constructor for invalid inputs
-        @test_throws ErrorException MaternP(-1)
+        @test_throws DomainError MaternP(-1)
 
         # can be constructed via Matern constructor with appropriate ν
         # we might not want to do that if we want to optimize ν
@@ -79,16 +134,16 @@ end
 
 @testset "kernel modifications" begin
 
-    k_strings = ["Exponentiated Quadratic", "Exponential", "δ",
-                "Constant", "Rational Quadratic",
-                "γ-Exponential",
-                "Matern"]#, "Spectral Mixture"]
-
-    r = 2*rand()
-    k_arr = [EQ(), Exp(), Delta(),
-            Constant(r), RQ(r),
-            γExp(r),
-            Matern(r)]#, SM]
+    # k_strings = ["Exponentiated Quadratic", "Exponential", "δ",
+    #             "Constant", "Rational Quadratic",
+    #             "γ-Exponential",
+    #             "Matern"]#, "Spectral Mixture"]
+    #
+    # r = 2*rand()
+    # k_arr = [EQ(), Exp(), Delta(),
+    #         Constant(r), RQ(r),
+    #         γExp(r),
+    #         Matern(r)]#, SM]
 
     using Kernel: Lengthscale
     l = exp(randn())
@@ -96,8 +151,9 @@ end
         r = randn(d)
         for (k, k_str) in zip(k_arr, k_strings)
             kl = Lengthscale(k, l)
-            @test kl(r) ≈ k(r/l)
-            @test typeof(kl) <: Kernel.IsotropicKernel
+            @test kl(r) ≈ k(euclidean(r)/l)
+            # @test typeof(kl) <: Kernel.IsotropicKernel
+            @test isstationary(kl)
         end
     end
 

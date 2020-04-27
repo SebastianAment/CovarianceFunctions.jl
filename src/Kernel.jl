@@ -26,6 +26,37 @@ abstract type MultiKernel{T} end # <: AbstractKernel{AbstractMatrix{T}} end # Mu
 
 const AllKernels{T} = Union{MercerKernel{T}, MultiKernel{T}}
 
+################################################################################
+# parameters function returns either scalar or recursive vcat of parameter vectors
+# useful for optimization algorithms which require the parameters in vector form
+parameters(::Any) = []
+parameters(::AbstractKernel{T}) where {T} = zeros(T, 0)
+nparameters(::Any) = 0
+
+# checks if θ has the correct number of parameters to initialize a kernel of typeof(k)
+function checklength(k::AbstractKernel, θ::AbstractVector)
+    nt = length(θ)
+    np = nparameters(k)
+    if nt ≠ np
+        throw(DimensionMismatch("length(θ) = $nt ≠ $np = nparameters(k)"))
+    end
+    return nt
+end
+
+# fallback for zero-parameter kernels
+function Base.similar(k::AbstractKernel, θ::AbstractVector)
+    n = checklength(k, θ)
+    if n == 0
+        typeof(k)()
+    elseif n == 1
+        typeof(k)(θ[1])
+    else
+        typeof(k)(θ)
+    end
+end
+Base.similar(k::AbstractKernel, θ::Number) = similar(k, [θ])
+
+################################################################################
 # if we have Matrix valued kernels, this should be different
 Base.eltype(k::AllKernels{T}) where {T} = T
 # fieldtype of vector space
@@ -39,10 +70,10 @@ fieldtype(x::Union{Tuple, AbstractArray}) = fieldtype(eltype(x))
 # and differentiate between data vector or vector of data
 # TODO: or instead, write run-time input check
 # change to a boundscheck?
-function checklength(x, y)
+function checklength(x::AbstractArray, y::AbstractArray)
     lx = length(x)
     ly = length(y)
-    lx == ly || throw(DimensionMismatch("length(x) ($lx) ≠ length(y) ($ly)"))
+    if lx == ly; throw(DimensionMismatch("length(x) ($lx) ≠ length(y) ($ly)")) end
     length(x)
 end
 
@@ -56,8 +87,10 @@ include("mercer.jl") # general mercer kernels
 # lazy way to represent gramian matrices
 # note: gramian specializations for special matrix structure
 # has to be after definition of all kernels
-include("gramian.jl")
-# include("autodiff.jl") # autodifferentiation for nlml optimziation
+include("gramian.jl") # deprecate in favor of kernel matrix
+# include("kernel_matrix.jl")
+include("properties.jl")
+# include("optimization.jl") # autodifferentiation for nlml optimziation
 
 import LinearAlgebraExtensions: iscov
 iscov(k::MercerKernel, x = randn(32), tol = 1e-10) = iscov(gramian(k, x), tol)
@@ -72,3 +105,27 @@ var(k::MercerKernel) = x->abs(k(x, x))
 std(k::MercerKernel) = x->sqrt(max(zero(eltype(x)), var(k)(x)))
 
 end # Kernel
+
+## TODO: abstract and general functions for parameter retrieval
+# function parameters(k::AbstractKernel)
+#     n = nparameters(k)
+#     θ = zeros(fieldtype(k), n)
+#     i = 1
+#     for field in fieldnames(typeof(k))
+#         ni = nparameters(k.)
+#         θ[i:i+ni]
+#     end
+#     θ
+# end
+#
+# nparameters(::AbstractFloat) = 1
+# nparameters(::Integer) = 0
+# nparameters(v::AbstractArray) = length(v)
+#
+# function nparameters(k::AbstractKernel)
+#     n = 0
+#     for field in fieldnames(typeof(k))
+#         n += length(k.field)
+#     end
+#     n
+# end

@@ -94,19 +94,3 @@ Projection(k::MercerKernel, x::AbstractVector) = Projection(gramian(k, x))
 # 1D stationary kernel on equi-spaced grid with periodic boundary conditions
 gramian(k::StationaryKernel, x::StepRangeLen{<:Real},
                             ::Val{true}) = Circulant(k.(x[1], x))
-
-########## Gradient of Gramian w.r.t. hyper parameters
-# struct GramianGradient{T, K, P<:Tuple, U, V} <: AbstractMatrix{T}
-#     k::K
-#     θ::P
-#     x::U
-#     y::V
-# end
-#
-# size(K::GramianGradient) = (length(K.x), length(K.y))
-#
-# function getindex(G::GramianGradient, i::Integer, j::Integer)
-#     @boundscheck checkbounds(G, i, j) # add bounds check to K
-#     k(x, y) = gradient(θ->G.k(θ)(x, y), G.θ...)
-#     @inbounds k(G.x[i], G.y[j]) # remove boundscheck of x
-# end

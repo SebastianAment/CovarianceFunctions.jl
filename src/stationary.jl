@@ -13,8 +13,10 @@ const euclidean = Metrics.EuclideanNorm()
 # TODO: Allow Matrix valued constant!
 struct Constant{T} <: IsotropicKernel{T}
     c::T
-    Constant(c) = ispsd(c) ? new{typeof(c)}(c) : error("Constant is negative")
+    Constant(c) = ispsd(c) ? new{typeof(c)}(c) : throw(DomainError("Constant is negative"))
 end
+parameters(k::Constant) = [k.c]
+nparameters(::Constant) = 1
 
 # should type of constant field and τ agree? what promotion is necessary?
 # do we need the isotropic/ stationary evaluation, if we overwrite the mercer one?
@@ -35,12 +37,14 @@ EQ() = EQ{Float64}()
 ########################## rational quadratic kernel ###########################
 struct RationalQuadratic{T} <: IsotropicKernel{T}
     α::T # relative weighting of small and large length scales
-    RationalQuadratic{T}(α) where T = (0 < α) ? new(α) : error("α not positive")
+    RationalQuadratic{T}(α) where T = (0 < α) ? new(α) : throw(DomainError("α not positive"))
 end
 const RQ = RationalQuadratic
-RQ(α::T) where T = RQ{T}(α)
+RQ(α::Real) = RQ{typeof(α)}(α)
 
 (k::RQ)(τ::Number) = (1 + τ^2 / (2*k.α))^-k.α
+parameters(k::RQ) = [k.α]
+nparameters(::RQ) = 1
 
 ########################### exponential kernel #################################
 struct Exponential{T} <: IsotropicKernel{T} end
@@ -50,14 +54,16 @@ Exp() = Exp{Float64}()
 (k::Exp)(τ::Number) = exp(-abs(τ))
 
 ############################ γ-exponential kernel ##############################
-struct GammaExponential{T} <: IsotropicKernel{T}
+struct GammaExponential{T<:Real} <: IsotropicKernel{T}
     γ::T
-    GammaExponential{T}(γ) where {T} = (0 ≤ γ ≤ 2) ? new(γ) : error("γ not in [0,2]")
+    GammaExponential{T}(γ) where {T} = (0 ≤ γ ≤ 2) ? new(γ) : throw(DomainError("γ not in [0,2]"))
 end
 const γExp = GammaExponential
 γExp(γ::T) where T = γExp{T}(γ)
 
 (k::γExp)(τ::Number) = exp(-abs(τ)^(k.γ)/2)
+parameters(k::γExp) = [k.γ]
+nparameters(::γExp) = 1
 
 ########################### white noise kernel #################################
 struct Delta{T} <: IsotropicKernel{T} end
@@ -74,9 +80,11 @@ gramian(::δ{T}, x::AbstractVector) where {T} = (one(T)*I)(length(x))
 using SpecialFunctions: gamma, besselk
 struct Matern{T} <: IsotropicKernel{T}
     ν::T
-    Matern{T}(ν) where T = (0 < ν) ? new(ν) : error("ν not positive")
+    Matern{T}(ν) where T = (0 < ν) ? new(ν) : throw(DomainError("ν = $ν is negative"))
 end
 Matern(ν::T) where {T} = Matern{T}(ν)
+parameters(k::Matern) = [k.ν]
+nparameters(::Matern) = 1
 
 # TODO: could have value type argument to dispatch p parameterization
 function (k::Matern)(τ::Number)
@@ -93,7 +101,7 @@ end
 # TODO: benchmark against the version where P is part of the type is below
 struct MaternP{T} <: IsotropicKernel{T}
     p::Int
-    MaternP{T}(p::Int) where T = 0 ≤ p ? new(p) : error("p is negative")
+    MaternP{T}(p::Int) where T = 0 ≤ p ? new(p) : throw(DomainError("p = $p is negative"))
 end
 
 MaternP(p::Int = 0) = MaternP{Float64}(p)
@@ -118,26 +126,17 @@ struct Cosine{T, V<:Union{T, AbstractVector{T}}} <: StationaryKernel{T}
 end
 const Cos = Cosine
 # TODO: look up trig-identity -> low-rank
-(k::Cosine)(τ) = cos(2π * (k.μ ⋅ τ))
+(k::Cosine)(τ) = cos(2π * dot(k.μ, τ))
+(k::Cosine{<:Number, <:Number})(τ) = cos(2π * k.μ * sum(τ))
+
+parameters(k::Cosine) = k.μ isa Number ? [k.μ] : k.μ
+nparameters(k::Cosine) = length(k.μ)
 
 ####################### spectral mixture kernel ################################
 # can be seen as product kernel of Constant, Cosine, ExponentiatedQuadratic
 Spectral(w::Real, μ, σ) = Product(Constant(w), Cos(μ), ARD(EQ(), 2π^2/σ.^2))
 SpectralMixture(w::AbstractVector, μ, σ) = Sum(x->Spectral(x...), zip(w, μ, σ))
 const SM = SpectralMixture
-
-########################## Poly-harmonic spline ################################
-# TODO: is T necessary here? might lead to problems, since promotion does not take place
-struct Polyharmonic{T, K} <: IsotropicKernel{T} end
-Polyharmonic(k::Integer) = Polyharmonic{Float64, k}()
-ThinPlate() = Polyharmonic{Float64, 2}()
-
-# PolyHarmonic{T}(k::Integer) where {T} = PolyHarmonicSpline{T, k}()
-# ThinPlate{T}() = PolyHarmonicSpline{T, 2}() # special case of PolyHarmonicSpline
-
-function (k::Polyharmonic{T, K})(τ::Number) where {T, K}
-    τ ≈ 0 ? zero(τ) : (iseven(K) ? τ^K * log(abs(τ)) : τ^K)
-end
 
 ############################ Cauchy Kernel #####################################
 # there is something else in the literature called with the same name ...
@@ -160,17 +159,27 @@ end
 # TODO: using meta-programming, could write constructors:
 # EQ(l::Float) = Lengthscale(EQ(), l)
 # for all isotropic kernels?
-# simple length scale modification to isotropic kernel (allow stationary kernels?)
-struct Lengthscale{T<:Real, K<:MercerKernel} <: IsotropicKernel{T}
+struct Lengthscale{T, K} <: StationaryKernel{T}
     k::K
     l::T
-    function Lengthscale(k::K, l::T) where {T<:Real, K<:IsotropicKernel}
-        S = promote_type(eltype(k), T)
+    function Lengthscale(k::StationaryKernel, l::Real)
+        if 0 > l; throw(DomainError("l = $l is non-positive")) end
+        S = promote_type(eltype(k), typeof(l))
         l = convert(S, l)
-        0 < l ? new{S, K}(k, l) : error("length scale is not positive")
+        new{S, typeof(k)}(k, l)
     end
 end
 (k::Lengthscale)(τ::Number) = k.k(τ/k.l)
+isisotropic(k::Lengthscale) = isisotropic(k.k)
+isstationary(k::Lengthscale) = isstationary(k.k)
+
+parameters(k::Lengthscale) = vcat(parameters(k.k), k.l)
+nparameters(k::Lengthscale) = nparameters(k.k) + 1
+function Base.similar(k::Lengthscale, θ::AbstractVector)
+    n = checklength(k, θ)
+    k = similar(k.k, @view(θ[1:n-1]))
+    Lengthscale(k, θ[n])
+end
 
 ########################### Change of Input Norm  ##############################
 # apply a different norm to input radius r of a stationary kernel
@@ -183,6 +192,16 @@ end
 # TODO: could have a IsotropicNormed kernel if N <: IsotropicNorm
 # currently, only relevant to Lᵖ norm
 (m::Normed)(τ) = m.k(m.n(τ))
+# WARNING: need to define parameters for norm function n (if it has any)
+parameters(k::Normed) = vcat(parameters(k.k), parameters(k.n))
+nparameters(k::Normed) = nparameters(k.k) + nparameters(k.n)
+function Base.similar(k::Normed, θ::AbstractVector)
+    checklength(k, θ)
+    nk = nparameters(k.k)
+    k = similar(k.k, @view(θ[1:nk]))
+    n = similar(k.n, @view(θ[nk+1:end]))
+    Normed(k, n)
+end
 
 # automatic relevance determination with length scale parameters l
 function ARD(k::StationaryKernel, l::AbstractVector{<:Real})
@@ -200,73 +219,10 @@ end
 # squared euclidean distance of x, y in the space (cos(x), sin(x))
 # since (cos(x) - cos(y))^2 + (sin(x) - sin(y))^2 = 4*sin((x-y)/2)^2
 (k::Periodic)(τ::Number) = k.k(sin(π*τ)^2)
+parameters(k::Periodic) = parameters(k.k)
+nparameters(k::Periodic) = nparameters(k.k)
 
-######################## stationarity tests ####################################
-# this is problematic, because it only allows for euclidean isotropy ...
-function isisotropic(k::MercerKernel, x::AbstractVector)
-    isiso = false
-    if isstationary(k)
-        isiso = true
-        r = euclidean(x[1]-x[2])
-        kxr = k(x_i/r, x_j/r)
-        for x_i in x, x_j in x
-            r = euclidean(x_i-x_j)
-            val = k(x_i/r, x_j/r)
-            if !(kxr ≈ val)
-                isiso = false
-            end
-        end
-    end
-    return isiso
-end
-
-# tests if k is stationary on finite set of points x
-# need to make this multidimensional
-function isstationary(k::MercerKernel, x::AbstractVector)
-    n = length(x)
-    d = length(x[1])
-    is_stationary = true
-    for i in 1:n, j in 1:n
-        ε = eltype(x) <: AbstractArray ? randn(d) : randn()
-        iseq = k(x[i], x[j]) ≈ k(x[i]+ε, x[j]+ε)
-        if !iseq
-            println(i ,j)
-            println(x[i], x[j])
-            println(k(x[i], x[j]) - k(x[i]+ε, x[j]+ε))
-            is_stationary = false
-            break
-        end
-    end
-    K = typeof(k)
-    if !is_stationary && (K <: StationaryKernel)
-        println("Covariance function " * string(K) * " is non-stationary but is subtype of StationaryKernel.")
-        return false
-    end
-
-    # if the kernel seems stationary but isn't a subtype of stationary kernel, suggest making it one
-    if is_stationary && !(K <: StationaryKernel)
-        println("Covariance function " * string(K) * " seems to be stationary. Consider making it a subtype of StationaryKernel.")
-        return false
-    end
-    return is_stationary
-end
-
-####################### Potential Future Additions #############################
-# for asset bubble testing, could include functions with α decay,
-# or the one in Jarrow's paper
-
-# Goals:
-# 1. GP software paper
-# 2. differential equations + gp
-# 3. active learning + gp
-# 4. active learning + materials
-#
-# 5. icsd library matching + rietvield refinement
-# 6. phase mapping
-#
-# 7. A exam
-
-
+########################### WIP / not relevant #################################
 #### special Matern version
 # struct MaternP{T, P} <: IsotropicKernel{T}
 #     MaternP{T}(p::Int) where T = 0 ≤ p ? new{T, p}(p) : error("p is negative")
@@ -293,4 +249,18 @@ end
 # # distance could be vector of squared component distances
 # function (k::SM)(τ::RTV)
 #     w * cos(2π * dot(μ, τ)) * exp(-2π^2 * dot(τ.^2, σ^2))
+# end
+
+########################## Poly-harmonic spline ################################
+# only conditionally p.s.d.
+# # TODO: is T necessary here? might lead to problems, since promotion does not take place
+# struct Polyharmonic{T, K} <: IsotropicKernel{T} end
+# Polyharmonic(k::Integer) = Polyharmonic{Float64, k}()
+# ThinPlate() = Polyharmonic{Float64, 2}()
+#
+# # PolyHarmonic{T}(k::Integer) where {T} = PolyHarmonicSpline{T, k}()
+# # ThinPlate{T}() = PolyHarmonicSpline{T, 2}() # special case of PolyHarmonicSpline
+#
+# function (k::Polyharmonic{T, K})(τ::Number) where {T, K}
+#     τ ≈ 0 ? zero(τ) : (iseven(K) ? τ^K * log(abs(τ)) : τ^K)
 # end

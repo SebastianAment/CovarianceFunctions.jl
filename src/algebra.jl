@@ -17,9 +17,31 @@ end
 (P::Product)(x, y) = prod(k->k(x, y), P.args)
 # (P::Product)(x, y) = isstationary(P) ? P(difference(x, y)) : prod(k->k(x, y), P.args)
 Product(k::MercerKernel...) = Product(k)
+Product(k::AbstractVector{<:AbstractKernel}) = Product(k...)
+Base.prod(k::AbstractVector{<:AbstractKernel}) = Product(k)
+
 Base.:*(k::MercerKernel...) = Product(k)
 Base.:*(c::Number, k::MercerKernel) = Constant(c) * k
 Base.:*(k::MercerKernel, c::Number) = Constant(c) * k
+
+parameters(k::Product) = vcat(parameters.(k.args)...)
+nparameters(k::Product) = sum(nparameters, k.args)
+function Base.similar(k::Product, θ::AbstractVector)
+    Product(_similar_helper(k, θ))
+end
+
+function _similar_helper(k, θ)
+    checklength(k, θ)
+    args = Vector{AbstractKernel}(undef, length(k.args))
+    for (i, k) in enumerate(k.args)
+        n = nparameters(k)
+        args[i] = similar(k, @view(θ[1:n]))
+        θ = @view(θ[n+1:end])
+    end
+    args
+end
+
+
 
 ################################### Sum ########################################
 struct Sum{T, AT<:Tuple{Vararg{MercerKernel}}} <: MercerKernel{T}
@@ -34,9 +56,21 @@ end
 # (S::Sum)(τ) = isstationary(S) ? sum(k->k(τ), S.args) : error("One argument evaluation not possible for non-stationary kernel")
 # (S::Sum)(x, y) = isstationary(S) ? S(difference(x, y)) : sum(k->k(x, y), S.args)
 Sum(k::MercerKernel...) = Sum(k)
+Sum(k::AbstractVector{<:AbstractKernel}) = Sum(k...)
+Base.sum(k::AbstractVector{<:AbstractKernel}) = Sum(k)
+
 Base.:+(k::MercerKernel...) = Sum(k)
 Base.:+(k::MercerKernel, c::Number) = k + Constant(c)
 Base.:+(c::Number, k::MercerKernel) = k + Constant(c)
+
+parameters(k::Sum) = vcat(parameters.(k.args)...)
+nparameters(k::Sum) = sum(nparameters, k.args)
+
+# constructs similar object to k, but with different values θ
+# overloading similar from Base
+function Base.similar(k::Sum, θ::AbstractVector)
+    Sum(_similar_helper(k, θ))
+end
 
 ################################## Power #######################################
 struct Power{T, K<:MercerKernel{T}} <: MercerKernel{T}
@@ -46,6 +80,11 @@ end
 (P::Power)(τ) = P.k(τ)^P.p
 (P::Power)(x, y) = P.k(x, y)^P.p
 Base.:^(k::MercerKernel, p::Int) = Power(k, p)
+parameters(k::Power) = parameters(k.k)
+nparameters(k::Power) = nparameters(k.k)
+function Base.similar(k::Power, θ::AbstractVector)
+    Power(similar(k.k, θ), k.p)
+end
 
 ############################ Separable Product #################################
 using LinearAlgebraExtensions: LazyGrid
@@ -58,10 +97,17 @@ struct SeparableProduct{T, K<:Tuple{Vararg{MercerKernel}}} <: MercerKernel{T}
         new{T, typeof(k)}(k)
     end
 end
+parameters(k::SeparableProduct) = vcat(parameters.(k.args)...)
+nparameters(k::SeparableProduct) = sum(nparameters, k.args)
+
+function Base.similar(k::SeparableProduct, θ::AbstractVector)
+    SeparableProduct(_similar_helper(k, θ))
+end
+
 # both x and y have to be vectors of inputs to individual kernels
-# TODO: check input lengths
 # could also consist of tuples ... so restricting to AbstractVector might not be good
 function (K::SeparableProduct)(x, y)
+    checklength(x, y)
     val = one(eltype(K))
     for (i, k) in enumerate(K.args)
         val *= k(x[i], y[i])
@@ -83,8 +129,16 @@ struct SeparableSum{T, K<:Tuple{Vararg{MercerKernel}}} <: MercerKernel{T}
         new{T, typeof(k)}(k)
     end
 end
+parameters(k::SeparableSum) = vcat(parameters.(k.args)...)
+nparameters(k::SeparableSum) = sum(nparameters, k.args)
+
+function Base.similar(k::SeparableSum, θ::AbstractVector)
+    SeparableSum(_similar_helper(k, θ))
+end
+
 # TODO: check input lengths
 function (K::SeparableSum)(x, y)
+    checklength(x, y)
     val = zero(eltype(K))
     for (i, k) in enumerate(K.args)
         val += k(x[i], y[i])
@@ -113,6 +167,14 @@ struct Symmetric{T, K<:MercerKernel} <: MercerKernel{T}
     k::K # kernel to be symmetrized
     z::T # center
 end
+parameters(k::Symmetric) = vcat(parameters(k.k), k.z)
+nparameters(k::Symmetric) = nparameters(k.k) + 1
+function Base.similar(k::Symmetric, θ::AbstractVector)
+    n = checklength(k, θ)
+    k = similar(k.k, @view(θ[1:n-1]))
+    Symmetric(k, θ[n])
+end
+
 # const Sym = Symmetric
 Symmetric(k::MercerKernel{T}) where T = Symmetric(k, zero(T))
 
@@ -131,6 +193,9 @@ struct VerticalRescaling{T, K<:MercerKernel{T}, F} <: MercerKernel{T}
     k::K
     a::F
 end
+parameters(k::VerticalRescaling) = vcat(parameters(k.k), parameters(k.a))
+nparameters(k::VerticalRescaling) = nparameters(k.k) + nparameters(k.a)
+
 (k::VerticalRescaling)(x, y) = k.a(x) * k.k(x, y) * k.a(y)
 # TODO: preserve structure if k.k is stationary and x, y are regular grids,
 # since that introduces Toeplitz structure
@@ -147,6 +212,8 @@ normalize(k::MercerKernel) = VerticalRescaling(k, x->1/√k(x, x))
 struct Derivative{T, K<:MercerKernel{T}} <: MercerKernel{T}
     k::K
 end
+parameters(k::Derivative) = parameters(k.k)
+nparameters(k::Derivative) = nparameterks(k.k)
 
 function (k::Derivative)(x::Real, y::Real)
     FD.derivative(y->FD.derivative(x->k.k(x, y), x), y)
