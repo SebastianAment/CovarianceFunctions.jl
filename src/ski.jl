@@ -164,20 +164,21 @@ end
 
 # Based on Sebastian Ament's algebra.jl file
 struct RandAddProj{T,K <: Tuple{Vararg{Kernel.AbstractKernel}}} <: Kernel.MercerKernel{T}
-    args::K # kernel for input covariances
-    weights::Matrix{Float64}
-    function RandAddProj(k::Tuple{Vararg{Kernel.AbstractKernel}}, dataDim)
-        weights = rand(Normal(), length(k), dataDim)
+    ks::K # kernel for input covariances
+    proj::Matrix{Float64}
+    weights::Vector{Float64}
+    function RandAddProj(k::Tuple{Vararg{Kernel.AbstractKernel}}, weights, dataDim)
+        proj = rand(Normal(), length(k), dataDim)
         T = promote_type(eltype.(k)...)
-        new{T,typeof(k)}(k, weights)
+        new{T,typeof(k)}(k, weights, proj)
     end
 end
 
 function (K::RandAddProj)(x, y)
     val = zero(promote_type(eltype(x), eltype(y)))
-    for (i, k) in enumerate(K.args)
-        @views val += k(dot(k.weights[i, :], x), dot(K.weights[i, :], y))
+    for (i, k) in enumerate(K.ks)
+        @views val += k.weights[i] * (dot(K.proj[i, :], x), dot(K.proj[i, :], y))
     end
-    return val
+    return val / length(K.ks)
 end
 
