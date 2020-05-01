@@ -173,10 +173,10 @@ struct RandAddProj{T,K <: Tuple{Vararg{Kernel.AbstractKernel}}} <: Kernel.Mercer
     end
 end
 
-function (K::RandAddProj)(x, x2)
-    val = zero(eltype(x))
+function (K::RandAddProj)(x, y)
+    val = zero(promote_type(eltype(x), eltype(y)))
     for (i, k) in enumerate(K.args)
-        val += k((K.weights[i] * x), (K.weights[i] * x2))
+        @views val += k(dot(k.weights[i, :], x), dot(K.weights[i, :], y))
     end
     return val
 end
