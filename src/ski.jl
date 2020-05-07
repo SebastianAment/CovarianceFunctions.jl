@@ -177,8 +177,8 @@ end
 function (K::RandAddProj)(x, y)
     val = zero(promote_type(eltype(x), eltype(y)))
     for (i, k) in enumerate(K.ks)
-        @views val += K.weights[i] * (dot(K.proj[i, :], x), dot(K.proj[i, :], y))
+        val += K.weights[i] * k(dot(K.proj[i, :], x), dot(K.proj[i, :], y))
     end
-    return val / length(K.ks)
+    return val
 end
 
