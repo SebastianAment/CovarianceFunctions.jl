@@ -61,7 +61,6 @@ function Base.similar(k::AbstractKernel, θ::AbstractVector)
     end
 end
 
-
 Base.similar(k::AbstractKernel, θ::Number) = similar(k, [θ])
 
 ################################################################################
