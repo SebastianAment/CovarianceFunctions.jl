@@ -98,7 +98,6 @@ include("mercer.jl") # general mercer kernels
 include("gramian.jl") # deprecate in favor of kernel matrix
 # include("kernel_matrix.jl")
 include("properties.jl")
-include("optimization.jl") # nlml optimziation of kernel hyper-parameters
 
 import LinearAlgebraExtensions: iscov
 iscov(k::MercerKernel, x = randn(32), tol = 1e-10) = iscov(gramian(k, x), tol)
