@@ -12,7 +12,7 @@ import Statistics: cov, var
 using Metrics
 
 # type unions we need often:
-const AbstractMatOrFac{T} = Union{AbstractMatrix{T}, Factorization{T}}
+using LinearAlgebraExtensions: AbstractMatOrFac
 
 # abstract type Kernel{T, S} end # could have "isscalar" field
 abstract type AbstractKernel{T} end # could be defined by input and output type ...
@@ -43,17 +43,25 @@ function checklength(k::AbstractKernel, θ::AbstractVector)
     return nt
 end
 
+# thanks to ffevotte in https://discourse.julialang.org/t/how-to-call-constructor-of-parametric-family-of-types-efficiently/38503/5
+stripped_type(x) = stripped_type(typeof(x))
+stripped_type(typ::DataType) = Base.typename(typ).wrapper
+
 # fallback for zero-parameter kernels
 function Base.similar(k::AbstractKernel, θ::AbstractVector)
     n = checklength(k, θ)
+    # kernel = eval(Meta.parse(string(typeof(k).name)))
+    kernel = stripped_type(k)
     if n == 0
-        typeof(k)()
+        kernel()
     elseif n == 1
-        typeof(k)(θ[1])
+        kernel(θ[1])
     else
-        typeof(k)(θ)
+        kernel(θ)
     end
 end
+
+
 Base.similar(k::AbstractKernel, θ::Number) = similar(k, [θ])
 
 ################################################################################
@@ -90,7 +98,7 @@ include("mercer.jl") # general mercer kernels
 include("gramian.jl") # deprecate in favor of kernel matrix
 # include("kernel_matrix.jl")
 include("properties.jl")
-# include("optimization.jl") # autodifferentiation for nlml optimziation
+include("optimization.jl") # nlml optimziation of kernel hyper-parameters
 
 import LinearAlgebraExtensions: iscov
 iscov(k::MercerKernel, x = randn(32), tol = 1e-10) = iscov(gramian(k, x), tol)

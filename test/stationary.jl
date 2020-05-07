@@ -12,58 +12,6 @@ using Kernel: iscov
 using Metrics
 const euclidean = Metrics.EuclideanNorm()
 
-####################### randomized stationarity tests ##########################
-# WARNING this test only allows for euclidean isotropy ...
-# does not matter for 1d tests
-function Kernel.isisotropic(k::MercerKernel, x::AbstractVector)
-    isiso = false
-    if isstationary(k)
-        isiso = true
-        r = euclidean(x[1]-x[2])
-        println(r)
-        kxr = k(x_i/r, x_j/r)
-        for x_i in x, x_j in x
-            r = euclidean(x_i-x_j)
-            val = k(x_i/r, x_j/r)
-            if !(kxr ≈ val)
-                isiso = false
-            end
-        end
-    end
-    return isiso
-end
-
-# tests if k is stationary on finite set of points x
-# need to make this multidimensional
-function Kernel.isstationary(k::MercerKernel, x::AbstractVector)
-    n = length(x)
-    d = length(x[1])
-    is_stationary = true
-    for i in 1:n, j in 1:n
-        ε = eltype(x) <: AbstractArray ? randn(d) : randn()
-        iseq = k(x[i], x[j]) ≈ k(x[i]+ε, x[j]+ε)
-        if !iseq
-            println(i ,j)
-            println(x[i], x[j])
-            println(k(x[i], x[j]) - k(x[i]+ε, x[j]+ε))
-            is_stationary = false
-            break
-        end
-    end
-    K = typeof(k)
-    if !is_stationary && (K <: StationaryKernel)
-        println("Covariance function " * string(K) * " is non-stationary but is subtype of StationaryKernel.")
-        return false
-    end
-
-    # if the kernel seems stationary but isn't a subtype of stationary kernel, suggest making it one
-    if is_stationary && !(K <: StationaryKernel)
-        println("Covariance function " * string(K) * " seems to be stationary. Consider making it a subtype of StationaryKernel.")
-        return false
-    end
-    return is_stationary
-end
-
 const k_strings = ["Exponentiated Quadratic", "Exponential", "δ",
             "Constant", "Rational Quadratic",
             "γ-Exponential", "Cosine",
@@ -134,17 +82,6 @@ end
 
 @testset "kernel modifications" begin
 
-    # k_strings = ["Exponentiated Quadratic", "Exponential", "δ",
-    #             "Constant", "Rational Quadratic",
-    #             "γ-Exponential",
-    #             "Matern"]#, "Spectral Mixture"]
-    #
-    # r = 2*rand()
-    # k_arr = [EQ(), Exp(), Delta(),
-    #         Constant(r), RQ(r),
-    #         γExp(r),
-    #         Matern(r)]#, SM]
-
     using Kernel: Lengthscale
     l = exp(randn())
     for d = 1:3
@@ -200,7 +137,17 @@ end
     kSLR = Kernel.Energetic(k, S)
     @test kSLR(x, y) ≈ kl(x, y)
 
-    # TODO: Learn how to write benchmarks
+    # periodic kernel
+    k = Kernel.EQ()
+    p = Kernel.Periodic(k)
+    x, y = randn(2)
+    @test p(x, y) isa Real
+    @test p(1+x) ≈ p(x) # 1 periodic
+    @test p(x, 1+y) ≈ p(x, y)  # 1 periodic
+    @test p(x+1, y-1) ≈ p(x, y)  # 1 periodic
+    @test p(x+7, y-3) ≈ p(x, y)  # 1 periodic
+
+    # TODO: write benchmarks
     # println(size(U*x))
     # println(size(x))
     # L = randn(d, 16)

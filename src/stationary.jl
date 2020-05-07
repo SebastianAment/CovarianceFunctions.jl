@@ -10,11 +10,15 @@ const euclidean = Metrics.EuclideanNorm()
 
 ############################# constant kernel ##################################
 # can be used to rescale existing kernels
-# TODO: Allow Matrix valued constant!
+# TODO: Allow Matrix valued constant
 struct Constant{T} <: IsotropicKernel{T}
     c::T
-    Constant(c) = ispsd(c) ? new{typeof(c)}(c) : throw(DomainError("Constant is negative"))
+    function Constant{T}(c::T) where T
+        ispsd(c) || throw(DomainError("Constant is negative: $c"))
+        new{T}(c)
+    end
 end
+Constant(c) = Constant{typeof(c)}(c)
 parameters(k::Constant) = [k.c]
 nparameters(::Constant) = 1
 
@@ -125,7 +129,7 @@ struct Cosine{T, V<:Union{T, AbstractVector{T}}} <: StationaryKernel{T}
     μ::V
 end
 const Cos = Cosine
-# TODO: look up trig-identity -> low-rank
+# TODO: trig-identity -> low-rank gramian
 (k::Cosine)(τ) = cos(2π * dot(k.μ, τ))
 (k::Cosine{<:Number, <:Number})(τ) = cos(2π * k.μ * sum(τ))
 
@@ -134,12 +138,12 @@ nparameters(k::Cosine) = length(k.μ)
 
 ####################### spectral mixture kernel ################################
 # can be seen as product kernel of Constant, Cosine, ExponentiatedQuadratic
-Spectral(w::Real, μ, σ) = Product(Constant(w), Cos(μ), ARD(EQ(), 2π^2/σ.^2))
-SpectralMixture(w::AbstractVector, μ, σ) = Sum(x->Spectral(x...), zip(w, μ, σ))
+Spectral(w::Real, μ, l) = prod((w, Cosine(μ), ARD(EQ(), l))) # 2π^2/σ.^2)
+SpectralMixture(w::AbstractVector, μ, l) = sum(Spectral.(w, μ, l))
 const SM = SpectralMixture
 
 ############################ Cauchy Kernel #####################################
-# there is something else in the literature called with the same name ...
+# there is something else in the literature with the same name ...
 struct Cauchy{T} <: IsotropicKernel{T} end
 Cauchy() = Cauchy{Float64}()
 (k::Cauchy)(τ::Number) =  1/(π * (1+τ^2))
@@ -163,7 +167,7 @@ struct Lengthscale{T, K} <: StationaryKernel{T}
     k::K
     l::T
     function Lengthscale(k::StationaryKernel, l::Real)
-        if 0 > l; throw(DomainError("l = $l is non-positive")) end
+        0 > l && throw(DomainError("l = $l is non-positive"))
         S = promote_type(eltype(k), typeof(l))
         l = convert(S, l)
         new{S, typeof(k)}(k, l)
@@ -207,6 +211,7 @@ end
 function ARD(k::StationaryKernel, l::AbstractVector{<:Real})
     Normed(k, Metrics.EnergeticNorm(Diagonal(1 ./ l)))
 end
+ARD(k::StationaryKernel, l::Real) = Lengthscale(k, l)
 function Energetic(k::StationaryKernel, A::AbstractMatOrFac{<:Real})
     Normed(k, Metrics.EnergeticNorm(A))
 end
@@ -217,10 +222,63 @@ struct Periodic{T, K<:StationaryKernel{T}} <: IsotropicKernel{T}
     k::K
 end
 # squared euclidean distance of x, y in the space (cos(x), sin(x))
-# since (cos(x) - cos(y))^2 + (sin(x) - sin(y))^2 = 4*sin((x-y)/2)^2
-(k::Periodic)(τ::Number) = k.k(sin(π*τ)^2)
-parameters(k::Periodic) = parameters(k.k)
-nparameters(k::Periodic) = nparameters(k.k)
+# since τ_new^2 = (cos(x) - cos(y))^2 + (sin(x) - sin(y))^2 = 4*sin((x-y)/2)^2 = 4sin(τ/2)^2
+(p::Periodic)(τ::Number) = p.k(2sin(π*τ)) # without scaling, this is 1-periodic
+parameters(p::Periodic) = parameters(p.k)
+nparameters(p::Periodic) = nparameters(p.k)
+Base.similar(p::Periodic, θ::AbstractVector) = similar(p.k, θ)
+
+
+####################### randomized stationarity tests ##########################
+# WARNING this test only allows for euclidean isotropy ...
+# does not matter for 1d tests
+function Kernel.isisotropic(k::MercerKernel, x::AbstractVector)
+    isiso = false
+    if isstationary(k)
+        isiso = true
+        r = euclidean(x[1]-x[2])
+        println(r)
+        kxr = k(x_i/r, x_j/r)
+        for x_i in x, x_j in x
+            r = euclidean(x_i-x_j)
+            val = k(x_i/r, x_j/r)
+            if !(kxr ≈ val)
+                isiso = false
+            end
+        end
+    end
+    return isiso
+end
+
+# tests if k is stationary on finite set of points x
+# need to make this multidimensional
+function Kernel.isstationary(k::MercerKernel, x::AbstractVector)
+    n = length(x)
+    d = length(x[1])
+    is_stationary = true
+    for i in 1:n, j in 1:n
+        ε = eltype(x) <: AbstractArray ? randn(d) : randn()
+        iseq = k(x[i], x[j]) ≈ k(x[i]+ε, x[j]+ε)
+        if !iseq
+            println(i ,j)
+            println(x[i], x[j])
+            println(k(x[i], x[j]) - k(x[i]+ε, x[j]+ε))
+            is_stationary = false
+            break
+        end
+    end
+    K = typeof(k)
+    if !is_stationary && isstationary(k)
+        println("Covariance function " * string(K) * " is non-stationary but kernel k returns isstationary(k) = true.")
+        return false
+    end
+
+    # if the kernel seems stationary but isn't a subtype of stationary kernel, suggest making it one
+    if is_stationary && !isstationary(k)
+        println("Covariance function " * string(K) * " seems to be stationary. Consider defining isstationary(k::$K) = true.")
+    end
+    return is_stationary
+end
 
 ########################### WIP / not relevant #################################
 #### special Matern version
@@ -240,17 +298,6 @@ nparameters(k::Periodic) = nparameters(k.k)
 #     val *= exp(-r) * (factorial(P)/factorial(2P))
 # end
 
-# struct SM{T, V, U} <: StationaryKernel{T}
-#     w::T # weight of Gaussian in frequency space
-#     μ::V # mean of Gaussian in frequency space
-#     σ::U # diagonal variance of
-#     # SM(w, μ, σ) = (0 < w) && (0 .< σ) ? new(w, μ, σ) : error("error")
-# end
-# # distance could be vector of squared component distances
-# function (k::SM)(τ::RTV)
-#     w * cos(2π * dot(μ, τ)) * exp(-2π^2 * dot(τ.^2, σ^2))
-# end
-
 ########################## Poly-harmonic spline ################################
 # only conditionally p.s.d.
 # # TODO: is T necessary here? might lead to problems, since promotion does not take place
@@ -263,4 +310,15 @@ nparameters(k::Periodic) = nparameters(k.k)
 #
 # function (k::Polyharmonic{T, K})(τ::Number) where {T, K}
 #     τ ≈ 0 ? zero(τ) : (iseven(K) ? τ^K * log(abs(τ)) : τ^K)
+# end
+
+# struct SpectralMixture{T, V, U} <: StationaryKernel{T}
+#     w::T # weight of Gaussian in frequency space
+#     μ::V # mean of Gaussian in frequency space
+#     σ::U # diagonal variance of gaussian
+#     # SM(w, μ, σ) = (0 < w) && (0 .< σ) ? new(w, μ, σ) : error("error")
+# end
+# distance could be vector of squared component distances
+# function (k::SM)(τ)
+#     w * cos(2π * dot(μ, τ)) * exp(-2π^2 * dot(τ.^2, σ^2))
 # end
