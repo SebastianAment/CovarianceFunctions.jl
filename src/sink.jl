@@ -9,8 +9,8 @@ using Kernel
 # https://people.eecs.berkeley.edu/~brecht/papers/07.rah.rec.nips.pdf
 
 function random_features(ϕ, x, wdist, bdist, D; islinear=Val(true))
-    w = rand(wdist, D, size(x, 1))
-    b = rand(bdist, x, size(x, 1))
+    w = rand(wdist, D, size(x, 1)) ? typeof(wdist) <: Distribution : wdist
+    b = rand(bdist, x, size(x, 1)) ? typeof(bdist) <: Distribution : bdist
     return random_features(ϕ, x, w, b, D; islinear), w, b
 end
 
@@ -32,16 +32,6 @@ function random_features!(ϕx, ϕ, x, w, b; islinear::Val{true})
     mul!(ϕx, w, x)
     ϕx .= ϕ.(ϕx .+ b)
     return ϕx
-end
-
-function fourier_dist(k)
-end
-
-function fourier_features(k, x, D)
-    bdist = Uniform(0, twoπ)
-    wdist = fourier_dist(k)
-    ϕ = x -> sqrt(2 / D) * cos(x) 
-    return random_features(ϕ, x, wdist, bdist, D)
 end
 
 include("./sink_lr.jl")

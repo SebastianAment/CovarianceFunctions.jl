@@ -12,7 +12,7 @@ end
 
 EmbeddedToeplitz(v) = @views EmbeddedToeplitz(Circulant([v; v[end - 1:-1:2]]))
 
-# Computes ABα + Cβ, writing over C
+# Computes A * b, writing over c
 function mul!(c, A::EmbeddedToeplitz, b)
     z = zeros(size(A.C, 1))
     z2 = zeros(size(A.C, 1))
@@ -34,6 +34,7 @@ struct StructuredKernelInterpolant{T,S} <: Factorization{T}
     Ku::EmbeddedToeplitz{T,S}
     W::SparseMatrixCSC{T,Int}
     d::Vector{T}
+    du::Vector{T}
 end
 
 #####
@@ -60,44 +61,60 @@ function _select_gridpoints!(idx, wt, train_vector, grid)
     stepsize = grid[2] - grid[1]
     idx .= floor.(Int, (train_vector .- grid[1]) ./ stepsize)
     idx .+= [-2 -1 0 1 2 3]
-    wt .= @views _lq_interp.((train_vector .- grid[idx]) ./ stepsize)
+    wt .= @views _lq_interp.(abs.(train_vector .- grid[idx]) ./ stepsize)
     return idx, wt
 end
 
 # Local Quintic Interpolation
 # Key's Cubic Convolution Interpolation Function
-function _lq_interp(x)
-    x′ = abs(x)
-    q = if x′ <= 1
-        ((( -0.84375 * x′ + 1.96875) * x′^2) - 2.125) * x.^2 + 1
-    elseif x′ <= 2
-        term1 = (0.203125 * x′ - 1.3125) * x′ + 2.65625
-        ((term1 * x′ - 0.875) * x′ - 2.578125) * x′ + 1.90625
-    elseif x′ <= 3
-        term2 = (0.046875 * x′ - 0.65625) * x′ + 3.65625
-        ((term2 * x′ - 10.125) * x′ + 13.921875) * x′ - 7.59375
-    else
-        0
+function _lq_interp(δ)
+    if δ <= 1
+        return ((( -0.84375 * δ + 1.96875) * δ ^ 2) - 2.125) * δ ^ 2 + 1
+    elseif δ <= 2
+        term1 = (0.203125 * δ - 1.3125) * δ + 2.65625
+        return ((term1 * δ - 0.875) * δ - 2.578125) * δ + 1.90625
+    elseif δ <= 3
+        term2 = (0.046875 * δ - 0.65625) * δ + 3.65625
+        return ((term2 * δ - 10.125) * δ + 13.921875) * δ - 7.59375
     end
-    return q
+    return 0
 end
 
 function mul!(c, S::StructuredKernelInterpolant, x)
     c .= S.W * (S.Ku * (S.W' * x)) .+ S.d .* x
-    return nothing
+    return c
+end
+
+function get_diag!(du, Ku, W)
+    rows = rowvals(W)
+    vals = nonzeros(W)
+    for i in 1:length(du)
+        Wcol = nzrange(W, i)
+        du[i] = 0
+        for j in Wcol
+            for k in Wcol
+                rj = rows[j]
+                rk = rows[k]
+                du[i] += Ku[rj, rk] * vals[j] * vals[k]
+            end
+        end
+    end
+    return du
 end
 
 # k is kernel, x is a vector of data, and m is the number of grid points
 function structured_kernel_interpolant(k, x, m)
-    G = Kernel.gramian(k, range(minimum(x), maximum(x), length = m))
-    v = G[1, :]
+    minx = minimum(x)
+    mδ = (maximum(x) - minx) / (m - 5)
+    grid = range(minx - mδ * 2, minx + mδ * (m - 3), length=m)
+    G = Kernel.gramian(k, grid)
+    v = G[:, 1]
     Ku = EmbeddedToeplitz(v)
-    W = SparseMatrixCSC{Float64,Int}(I, size(Ku)...)
+    W = interp_grid(x, grid)
     d = diag(Kernel.gramian(k, x))
-    for i in 1:length(x)
-        d[i] -= W[:, i]' * (Ku * (W[:, i]))
-    end
-    return StructuredKernelInterpolant(Ku, W, d)
+    du = get_diag!(similar(d), Ku, W)
+    d .-= du
+    return StructuredKernelInterpolant(Ku, W, d, du)
 end
 
 # Gives dimension for the given n x n matrix. Outputs a tuple of the dimensions
@@ -110,7 +127,7 @@ function ldiv!(S::StructuredKernelInterpolant, b)
     x = similar(b)
     cg!(x, S, b)
     b .= x
-    return nothing
+    return b
 end
 
 # Takes the determinent of S. Returns a scalar
