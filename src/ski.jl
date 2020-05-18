@@ -105,7 +105,7 @@ end
 # k is kernel, x is a vector of data, and m is the number of grid points
 function structured_kernel_interpolant(k, x, m)
     xmin = minimum(x)
-    δm = (maximum(x) - xmin) / (1 + (m - 5.5) / m) / m
+    δm = (maximum(x) - xmin) / (m - 5.5)
     m0 = xmin - 2 * δm
     grid = range(m0, m0 + (m - 1) * δm, step=δm)
     G = Kernel.gramian(k, grid)
