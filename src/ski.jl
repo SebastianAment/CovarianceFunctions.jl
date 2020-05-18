@@ -104,9 +104,10 @@ end
 
 # k is kernel, x is a vector of data, and m is the number of grid points
 function structured_kernel_interpolant(k, x, m)
-    minx = minimum(x)
-    mδ = (maximum(x) - minx) / (m - 5)
-    grid = range(minx - mδ * 2, minx + mδ * (m - 3), length=m)
+    xmin = minimum(x)
+    δm = (maximum(x) - xmin) / (1 + (m - 5.5) / m) / m
+    m0 = xmin - 2 * δm
+    grid = range(m0, m0 + (m - 1) * δm, step=δm)
     G = Kernel.gramian(k, grid)
     v = G[:, 1]
     Ku = EmbeddedToeplitz(v)
