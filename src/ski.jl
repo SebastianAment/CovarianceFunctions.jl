@@ -4,7 +4,7 @@ using LinearAlgebra
 using IterativeSolvers
 using Kernel
 using Distributions
-import Base: size
+import Base: size, getindex
 
 struct EmbeddedToeplitz{T,S} <: AbstractMatrix{T}
     C::Circulant{T,S}
@@ -59,8 +59,9 @@ end
 
 function _select_gridpoints!(idx, wt, train_vector, grid) 
     stepsize = grid[2] - grid[1]
-    idx .= floor.(Int, (train_vector .- grid[1]) ./ stepsize)
+    idx .= floor.(Int, ((train_vector .- grid[1]) ./ stepsize))
     idx .+= [-2 -1 0 1 2 3]
+    idx .+= 1
     wt .= @views _lq_interp.(abs.(train_vector .- grid[idx]) ./ stepsize)
     return idx, wt
 end
@@ -69,7 +70,7 @@ end
 # Key's Cubic Convolution Interpolation Function
 function _lq_interp(δ)
     if δ <= 1
-        return ((( -0.84375 * δ + 1.96875) * δ ^ 2) - 2.125) * δ ^ 2 + 1
+        return ((( -0.84375 * δ + 1.96875) * δ^2) - 2.125) * δ^2 + 1
     elseif δ <= 2
         term1 = (0.203125 * δ - 1.3125) * δ + 2.65625
         return ((term1 * δ - 0.875) * δ - 2.578125) * δ + 1.90625
@@ -105,9 +106,9 @@ end
 # k is kernel, x is a vector of data, and m is the number of grid points
 function structured_kernel_interpolant(k, x, m)
     xmin = minimum(x)
-    δm = (maximum(x) - xmin) / (m - 5.5)
-    m0 = xmin - 2 * δm
-    grid = range(m0, m0 + (m - 1) * δm, step=δm)
+    δm = (maximum(x) - xmin) / (m - 6)
+    m0 = xmin - 2.5 * δm
+    grid = range(m0, m0 + (m - 1) * δm, step = δm)
     G = Kernel.gramian(k, grid)
     v = G[:, 1]
     Ku = EmbeddedToeplitz(v)

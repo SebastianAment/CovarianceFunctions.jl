@@ -1,11 +1,7 @@
-
 include("ski.jl")
 using BenchmarkTools
+
 # Testing stuff
-
-
-
-
 struct PointGenerator
     f
 end
@@ -58,21 +54,6 @@ nonSKIExpKernContrivedHundred = Kernel.Gramian(expKern, hundredPointsContrivedx,
 nonSKIExpKernContrivedThousand = Kernel.Gramian(expKern, thousandPointsContrivedx, thousandPointsContrivedx)
 nonSKIExpKernContrivedTenThousand = Kernel.Gramian(expKern, tenThousandPointContrivedx, tenThousandPointContrivedx)
 
-SKIExpKernExpTen = structured_kernel_interpolant(expKern, tenPointsExpx, 10)
-SKIExpKernExpHundred = structured_kernel_interpolant(expKern, hundredPointsExpx, 1000)
-SKIExpKernExpThousand = structured_kernel_interpolant(expKern, thousandPointsExpx, 10000)
-SKIExpKernExpTenThousand = structured_kernel_interpolant(expKern, tenThousandPointExpx, 100000)
-
-SKIExpKernSinTen = structured_kernel_interpolant(expKern, tenPointsSinx, 100)
-SKIExpKernSinHundred = structured_kernel_interpolant(expKern, hundredPointsSinx, 1000)
-SKIExpKernSinThousand = structured_kernel_interpolant(expKern, thousandPointsSinx, 10000)
-SKIExpKernSinTenThousand = structured_kernel_interpolant(expKern, tenThousandPointSinx, 100000)
-
-SKIExpKernContrivedTen = structured_kernel_interpolant(expKern, tenPointsContrivedx, 100)
-SKIExpKernContrivedHundred = structured_kernel_interpolant(expKern, hundredPointsContrivedx, 1000)
-SKIExpKernContrivedThousand = structured_kernel_interpolant(expKern, thousandPointsContrivedx, 10000)
-SKIExpKernContrivedTenThousand = structured_kernel_interpolant(expKern, tenThousandPointContrivedx, 100000)
-
 suite = BenchmarkTools.BenchmarkGroup()
 suite["expKernExpDatNonSki"] = BenchmarkTools.BenchmarkGroup()
 suite["expKernExpDatNonSki"]["ten"] = @benchmarkable Matrix($nonSKIExpKernExpTen)
@@ -92,23 +73,23 @@ suite["expKernContrivedDatNonSki"]["hundred"] = @benchmarkable Matrix($nonSKIExp
 suite["expKernContrivedDatNonSki"]["thousand"] = @benchmarkable Matrix($nonSKIExpKernContrivedThousand)
 suite["expKernContrivedDatNonSki"]["ten thousand"] = @benchmarkable Matrix($nonSKIExpKernContrivedTenThousand)
 
-# suite["expKernExpDatSki"] = BenchmarkTools.BenchmarkGroup()
-# suite["expKernExpDatSki"]["ten"] = @benchmarkable structured_kernel_interpolant(expKern, tenPointsExpx, 10)
-# suite["expKernExpDatSki"]["hundred"] = @benchmarkable structured_kernel_interpolant(expKern, hundredPointsExpx, 10)
-# suite["expKernExpDatSki"]["thousand"] = @benchmarkable structured_kernel_interpolant(expKern, thousandPointsExpx, 10)
-# suite["expKernExpDatSki"]["ten thousand"] = @benchmarkable structured_kernel_interpolant(expKern, tenThousandPointExpx, 10)
+suite["expKernExpDatSki"] = BenchmarkTools.BenchmarkGroup()
+suite["expKernExpDatSki"]["ten"] = @benchmarkable structured_kernel_interpolant(expKern, $sort(tenPointsExpx), 100)
+suite["expKernExpDatSki"]["hundred"] = @benchmarkable structured_kernel_interpolant(expKern, $sort(hundredPointsExpx), 1000)
+suite["expKernExpDatSki"]["thousand"] = @benchmarkable structured_kernel_interpolant(expKern, $sort(thousandPointsExpx), 10000)
+suite["expKernExpDatSki"]["ten thousand"] = @benchmarkable structured_kernel_interpolant(expKern, $sort(tenThousandPointExpx), 100000)
 
-# suite["expKernSinDatSki"] = BenchmarkTools.BenchmarkGroup()
-# suite["expKernSinDatSki"]["ten"] = @benchmarkable structured_kernel_interpolant(expKern, tenPointsSinx, 10)
-# suite["expKernSinDatSki"]["hundred"] = @benchmarkable structured_kernel_interpolant(expKern, hundredPointsSinx, 10)
-# suite["expKernSinDatSki"]["thousand"] = @benchmarkable structured_kernel_interpolant(expKern, thousandPointsSinx, 10)
-# suite["expKernSinDatSki"]["ten thousand"] = @benchmarkable structured_kernel_interpolant(expKern, tenThousandPointSinx, 10)
+suite["expKernSinDatSki"] = BenchmarkTools.BenchmarkGroup()
+suite["expKernSinDatSki"]["ten"] = @benchmarkable structured_kernel_interpolant(expKern, $sort(tenPointsSinx), 100)
+suite["expKernSinDatSki"]["hundred"] = @benchmarkable structured_kernel_interpolant(expKern, $sort(hundredPointsSinx), 1000)
+suite["expKernSinDatSki"]["thousand"] = @benchmarkable structured_kernel_interpolant(expKern, $sort(thousandPointsSinx), 10000)
+suite["expKernSinDatSki"]["ten thousand"] = @benchmarkable structured_kernel_interpolant(expKern, $sort(tenThousandPointSinx), 100000)
 
-# suite["expKernContrivedDatSki"] = BenchmarkTools.BenchmarkGroup()
-# suite["expKernContrivedDatSki"]["ten"] = @benchmarkable structured_kernel_interpolant(expKern, tenPointsContrivedx, 10)
-# suite["expKernContrivedDatSki"]["hundred"] = @benchmarkable structured_kernel_interpolant(expKern, hundredPointsContrivedx, 10)
-# suite["expKernContrivedDatSki"]["thousand"] = @benchmarkable structured_kernel_interpolant(expKern, thousandPointsContrivedx, 10)
-# suite["expKernContrivedDatSki"]["ten thousand"] = @benchmarkable structured_kernel_interpolant(expKern, tenThousandPointContrivedx, 10)
+suite["expKernContrivedDatSki"] = BenchmarkTools.BenchmarkGroup()
+suite["expKernContrivedDatSki"]["ten"] = @benchmarkable structured_kernel_interpolant(expKern, $sort(tenPointsContrivedx), 100)
+suite["expKernContrivedDatSki"]["hundred"] = @benchmarkable structured_kernel_interpolant(expKern, $sort(hundredPointsContrivedx), 1000)
+suite["expKernContrivedDatSki"]["thousand"] = @benchmarkable structured_kernel_interpolant(expKern, $sort(thousandPointsContrivedx), 10000)
+suite["expKernContrivedDatSki"]["ten thousand"] = @benchmarkable structured_kernel_interpolant(expKern, $sort(tenThousandPointContrivedx), 100000)
 
 
 BenchmarkTools.run(suite)
