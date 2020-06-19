@@ -7,6 +7,9 @@ using Kernel: MercerKernel, IsotropicKernel, isstationary
 
 using Kernel
 using Kernel: Constant, EQ, RQ, Exp, γExp, Delta, Cosine, MaternP, Matern#, SM
+using Kernel: separable, gramian
+using LinearAlgebraExtensions: grid
+using KroneckerProducts: KroneckerProduct
 
 # TODO:
 # test higher input dimensions
@@ -78,11 +81,13 @@ using Kernel: Constant, EQ, RQ, Exp, γExp, Delta, Cosine, MaternP, Matern#, SM
 end
 
 @testset "separable kernels" begin
-    using Kernel: separable
     k = Kernel.EQ()
     k = separable(*, k, k, k)
     h = separable(^, Kernel.EQ(), 3)
     @test typeof(k) == typeof(h)
+    x = randn(3)
+    x = grid(x, x, x)
+    @test gramian(k, x) isa KroneckerProduct
     # probably the flattening is not a good idea
     # @test typeof(separable(*, k, h)) == typeof(separable(^, Kernel.EQ(), 6))
 end

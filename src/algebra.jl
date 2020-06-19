@@ -87,7 +87,7 @@ function Base.similar(k::Power, θ::AbstractVector)
 end
 
 ############################ Separable Product #################################
-using LinearAlgebraExtensions: LazyGrid
+using LinearAlgebraExtensions: LazyGrid, grid
 # TODO: this could subsume Separable in multi
 # product kernel, but separately evaluates component kernels on different parts of the input
 struct SeparableProduct{T, K<:Tuple{Vararg{MercerKernel}}} <: MercerKernel{T}

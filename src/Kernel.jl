@@ -1,5 +1,7 @@
 module Kernel
 # could rename "Mercer"
+using KroneckerProducts
+
 using LinearAlgebra
 using ForwardDiff
 const FD = ForwardDiff
