@@ -1,4 +1,5 @@
 using ToeplitzMatrices: Circulant, SymmetricToeplitz
+using LinearAlgebraExtensions: vecofvec
 
 ############################ Lazy Gramian Matrix ###############################
 # TODO: move to MyLazyArrays?
@@ -58,7 +59,13 @@ gramian(k::MercerKernel, x::AbstractVector, y::AbstractVector) = Gramian(k, x, y
 gramian(k::MercerKernel, x) = gramian(k, x, x)
 
 gramian(x::AbstractVector, y::AbstractVector) = Gramian(x, y)
-gramian(x::AbstractVector) = Gramian(x, x)
+gramian(x::AbstractVector) = gramian(x, x)
+
+# if matrix whose columns are datapoints is passed, convert to vector of vectors
+gramian(k::MercerKernel, x::AbstractMatrix) = gramian(k, vecofvec(x))
+function gramian(k::MercerKernel, x::AbstractMatrix, y::AbstractMatrix)
+    gramian(k, vecofvec(x), vecofvec(y))
+end
 
 # to project vectors into the RKHS formed by k on x
 import LinearAlgebraExtensions: Projection

@@ -14,7 +14,6 @@ using KroneckerProducts: KroneckerProduct
 # TODO:
 # test higher input dimensions
 # test type stability
-
 @testset "stationary kernels" begin
 
     k1 = EQ()
@@ -86,10 +85,13 @@ end
     h = separable(^, Kernel.EQ(), 3)
     @test typeof(k) == typeof(h)
     x = randn(3)
-    x = grid(x, x, x)
-    @test gramian(k, x) isa KroneckerProduct
-    # probably the flattening is not a good idea
-    # @test typeof(separable(*, k, h)) == typeof(separable(^, Kernel.EQ(), 6))
+    g = grid(x, x, x)
+    @test gramian(k, g) isa KroneckerProduct
+
+    y = randn(3, 4)
+    g = grid(x, y)
+    G = gramian(k, g)
+    @test G isa KroneckerProduct
 end
 
 end # TestAlgebra

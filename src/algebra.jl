@@ -41,8 +41,6 @@ function _similar_helper(k, θ)
     args
 end
 
-
-
 ################################### Sum ########################################
 struct Sum{T, AT<:Tuple{Vararg{MercerKernel}}} <: MercerKernel{T}
     args::AT
@@ -117,6 +115,9 @@ end
 # if we had kernel input type, could compare with eltype(X)
 function gramian(K::SeparableProduct, X::LazyGrid, Y::LazyGrid)
     kronecker((gramian(kxy...) for kxy in zip(K.args, X.args, Y.args))...)
+end
+function gramian(K::SeparableProduct, X::LazyGrid)
+    kronecker((gramian(kx...) for kx in zip(K.args, X.args))...)
 end
 # TODO: if points are not on a grid, can still evaluate dimensions separately,
 # and take elementwise product. Might lead to efficiency gains
