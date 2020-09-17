@@ -98,6 +98,7 @@ include("mercer.jl") # general mercer kernels
 # has to be after definition of all kernels
 include("gramian.jl") # deprecate in favor of kernel matrix
 # include("kernel_matrix.jl")
+include("gpkernels.jl")
 include("properties.jl")
 
 import LinearAlgebraExtensions: iscov
