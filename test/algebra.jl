@@ -2,7 +2,6 @@ module TestAlgebra
 
 using Test
 using LinearAlgebra
-using Kernel: iscov
 using Kernel: MercerKernel, IsotropicKernel, isstationary
 
 using Kernel
@@ -19,16 +18,6 @@ using KroneckerProducts: KroneckerProduct
     k1 = EQ()
     k2 = Matern(5*rand())
     k3 = Kernel.Dot()
-
-    # moving to trait-based system ...
-    # @test typeof(k1 + k2) <: IsotropicKernel
-    # @test typeof(k1 * k2) <: IsotropicKernel
-    # @test typeof(k2 * k1) <: IsotropicKernel
-    # for p = 2:4
-    #     @test typeof(k1^p) <: IsotropicKernel
-    #     @test typeof(k2^p) <: IsotropicKernel
-    #     @test typeof(float(p)*k1) <: IsotropicKernel
-    # end
 
     @test typeof(k1 * k3) <: MercerKernel
 
@@ -95,3 +84,13 @@ end
 end
 
 end # TestAlgebra
+
+# moving to trait-based system ...
+# @test typeof(k1 + k2) <: IsotropicKernel
+# @test typeof(k1 * k2) <: IsotropicKernel
+# @test typeof(k2 * k1) <: IsotropicKernel
+# for p = 2:4
+#     @test typeof(k1^p) <: IsotropicKernel
+#     @test typeof(k2^p) <: IsotropicKernel
+#     @test typeof(float(p)*k1) <: IsotropicKernel
+# end

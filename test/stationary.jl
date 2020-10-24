@@ -7,10 +7,8 @@ using LinearAlgebraExtensions: LowRank
 using Kernel
 using Kernel: MercerKernel, StationaryKernel, isstationary, isisotropic
 using Kernel: Constant, EQ, RQ, Exp, γExp, Delta, Cosine, MaternP, Matern#, SM
-using Kernel: iscov
-
-using Metrics
-const euclidean = Metrics.EuclideanNorm()
+using Kernel: iscov, enorm
+using Kernel: Normed
 
 const k_strings = ["Exponentiated Quadratic", "Exponential", "δ",
             "Constant", "Rational Quadratic",
@@ -88,17 +86,12 @@ end
         r = randn(d)
         for (k, k_str) in zip(k_arr, k_strings)
             kl = Lengthscale(k, l)
-            @test kl(r) ≈ k(euclidean(r)/l)
+            @test kl(r) ≈ k(norm(r)/l)
             # @test typeof(kl) <: Kernel.IsotropicKernel
             @test isstationary(kl)
         end
     end
 
-    using Kernel: Normed
-    using Metrics
-    using Metrics: Energetic
-
-    # n = Metrics.norm(Energetic()
     ########### Testing ARD
     d = 2
     k = Kernel.EQ()
@@ -125,9 +118,8 @@ end
 
     d = 3
     U = randn(1, d)
-    n = Metrics.EnergeticNorm(U'U)
-    # kl = Kernel.Normed(k, n)
-    kl = Kernel.Energetic(k, U'U)
+    n(x) = enorm(U'U, x)
+    kl = Kernel.Normed(k, n)
     x = randn(d)
     y = randn(d)
     @test kl(x, y) ≈ k(U*x, U*y)

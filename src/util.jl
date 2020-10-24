@@ -1,6 +1,9 @@
 # energetic norm
 enorm(A::AbstractMatOrFac, x::AbstractVector) = sqrt(dot(x, A, x))
 
+import LinearAlgebraExtensions: iscov
+iscov(k::MercerKernel, x = randn(32), tol = 1e-10) = iscov(gramian(k, x), tol)
+
 # TODO: maybe include in and output dimension of kernel in type?
 # this makes it easier to type check admissability of input arguments
 # and differentiate between data vector or vector of data
