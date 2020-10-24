@@ -33,11 +33,16 @@ using Kernel: gramian, Gramian
     x = randn(Float64, n)
     k = Kernel.EQ{Float32}()
     G = gramian(k, x)
+    println(typeof(k(x[1], x[1])))
     # type promotion
-    @test typeof(G) <: Gramian{Float64} # test promotion in inner constructor
+    @test typeof(k(x[1], x[1])) <: typeof(G[1,1]) # test promotion in inner constructor
+    @test typeof(k(x[1], x[1])) <: eltype(G) # test promotion in inner constructor
     x = tuple.(x, x)
     G = gramian(k, x)
-    @test typeof(G) <: Gramian{Float64} # with tuples (or arrays)
+    @test typeof(k(x[1], x[1])) <: typeof(G[1,1])  # with tuples (or arrays)
+    @test typeof(k(x[1], x[1])) <: eltype(G)
+
+    # TODO: MultiKernel test
 end
 
 @testset "toeplitz structure" begin

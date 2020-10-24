@@ -12,15 +12,38 @@ struct Gramian{T, K, U<:AbstractVector,
     y::V
     function Gramian(k, x::AbstractVector, y::AbstractVector)
         T = promote_type(fieldtype.((k, x, y))...)
+        if eltype(k) <: AbstractMatrix
+            T = Matrix{T}
+        end
         new{T, typeof(k), typeof(x), typeof(y)}(k, x, y)
     end
 end
 # with euclidean dot product
 Gramian(x::AbstractVector, y::AbstractVector) = Gramian(Kernel.Dot(), x, y)
 
+# size of an element of a matrix of matrices
+elsize(G::Gramian{<:AbstractMatrix}) = size(G[1,1])
+
+
 # TODO: + HODLR?
 function LinearAlgebra.factorize(G::Gramian; check::Bool = true, tol::Real = 1e-12)
-    cholesky(G, Val(true); check = check, tol = tol) # my own implementation of pivoted cholesky
+    cholesky(G, Val(true); check = check, tol = tol) # implementation of pivoted cholesky
+end
+
+const AbstractVecOfVec{T} = AbstractVector{<:AbstractVector{T}}
+# recursivelye calls mul!, thereby avoiding memory allocation of
+# block-matrix multiplication
+# IDEA: GPU
+function LinearAlgebra.mul!(x::AbstractVecOfVec, G::Gramian{<:Matrix}, y::AbstractVecOfVec)
+# function recmul!(x::AbstractVecOfVec, G::Gramian{<:Matrix}, y::AbstractVecOfVec)
+    d = elsize(G, 1)
+    all(==(d), (length(xi) for xi in x)) || throw(DimensionMismatch("component vectors do not have the same size as component matrices"))
+    for j in eachindex(y)
+        for i in eachindex(x)
+            mul!(x[i], G[i, j], y[j])
+        end
+    end
+    return x
 end
 
 # TODO: could define algebra
@@ -45,31 +68,30 @@ end
 
 Base.eltype(G::Gramian{T}) where {T} = T
 
-import LinearAlgebra: issymmetric, isposdef, ishermitian
 # this yields the incorrect result in the rare case that x and y are identical,
 # but are not stored in the same place in memory. The benefit of this is
 # that is can be computed in constant time
-issymmetric(G::Gramian) = G.x === G.y
-isposdef(G::Gramian) = issymmetric(G)
-ishermitian(G::Gramian) = issymmetric(G)
+LinearAlgebra.issymmetric(G::Gramian) = G.x ≡ G.y
+LinearAlgebra.isposdef(G::Gramian) = issymmetric(G)
+LinearAlgebra.ishermitian(G::Gramian) = issymmetric(G)
 
 ######################### smart pseudo-constructor #############################
 # standard approach is a lazily represented kernel matrix
-gramian(k::MercerKernel, x::AbstractVector, y::AbstractVector) = Gramian(k, x, y)
-gramian(k::MercerKernel, x) = gramian(k, x, x)
+gramian(k, x::AbstractVector, y::AbstractVector) = Gramian(k, x, y)
+gramian(k, x) = gramian(k, x, x)
 
 gramian(x::AbstractVector, y::AbstractVector) = Gramian(x, y)
 gramian(x::AbstractVector) = gramian(x, x)
 
 # if matrix whose columns are datapoints is passed, convert to vector of vectors
-gramian(k::MercerKernel, x::AbstractMatrix) = gramian(k, vecofvec(x))
-function gramian(k::MercerKernel, x::AbstractMatrix, y::AbstractMatrix)
+gramian(k, x::AbstractMatrix) = gramian(k, vecofvec(x))
+function gramian(k, x::AbstractMatrix, y::AbstractMatrix)
     gramian(k, vecofvec(x), vecofvec(y))
 end
 
 # to project vectors into the RKHS formed by k on x
-import LinearAlgebraExtensions: Projection
-Projection(k::MercerKernel, x::AbstractVector) = Projection(gramian(k, x))
+# import LinearAlgebraExtensions: Projection
+# Projection(k, x::AbstractVector) = Projection(gramian(k, x))
 
 # this has to be done lazily to preserve structure
 # gramian(k::VerticalRescaling, x) = Diagonal(k.f.(x)) * marginal(k.k, x) * Diagonal(k.f.(x))

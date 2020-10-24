@@ -1,17 +1,17 @@
 module Kernel
 # could rename "Mercer"
-using KroneckerProducts
 
 using LinearAlgebra
 using ForwardDiff
+using DiffResults
+using ForwardDiff: derivative, gradient
 const FD = ForwardDiff
 using LinearAlgebraExtensions
+using KroneckerProducts
+
 # TODO maybe these should be extended in GaussianProcess to keep Kernel free
 # of probabilistic functions
-import Statistics: cov, var
-
-# my packages
-using Metrics
+using Statistics
 
 # type unions we need often:
 using LinearAlgebraExtensions: AbstractMatOrFac
@@ -24,7 +24,7 @@ abstract type StationaryKernel{T} <: MercerKernel{T} end
 abstract type IsotropicKernel{T} <: StationaryKernel{T} end # ίσος + τρόπος (equal + way)
 
 # class of matrix-valued kernels for multi-output GPs
-abstract type MultiKernel{T} end # <: AbstractKernel{AbstractMatrix{T}} end # MultiKernel
+abstract type MultiKernel{T} <: AbstractKernel{T} end # MultiKernel
 
 const AllKernels{T} = Union{MercerKernel{T}, MultiKernel{T}}
 
@@ -68,23 +68,15 @@ Base.similar(k::AbstractKernel, θ::Number) = similar(k, [θ])
 ################################################################################
 # if we have Matrix valued kernels, this should be different
 Base.eltype(k::AllKernels{T}) where {T} = T
+Base.eltype(::MultiKernel{T}) where {T} = Matrix{T}
+
 # fieldtype of vector space
-fieldtype(k::AllKernels) = eltype(k)
+fieldtype(k::AbstractKernel) = eltype(k)
 fieldtype(x) = eltype(x) # base
 fieldtype(x::Union{Tuple, AbstractArray}) = fieldtype(eltype(x))
-# Base.eltype(T; recursive::Val{true}) = T == eltype(T) ? T : eltype(T, recursive = Val(true))
+# # Base.eltype(T; recursive::Val{true}) = T == eltype(T) ? T : eltype(T, recursive = Val(true))
 
-# TODO: maybe include in and output dimension of kernel in type?
-# this makes it easier to type check admissability of input arguments
-# and differentiate between data vector or vector of data
-# TODO: or instead, write run-time input check
-# change to a boundscheck?
-function checklength(x::AbstractArray, y::AbstractArray)
-    lx = length(x)
-    ly = length(y)
-    if lx == ly; throw(DimensionMismatch("length(x) ($lx) ≠ length(y) ($ly)")) end
-    length(x)
-end
+include("util.jl")
 
 # include all types of kernels
 include("algebra.jl") # kernel operations
@@ -96,8 +88,10 @@ include("mercer.jl") # general mercer kernels
 # lazy way to represent gramian matrices
 # note: gramian specializations for special matrix structure
 # has to be after definition of all kernels
-include("gramian.jl") # deprecate in favor of kernel matrix
+include("gramian.jl") # deprecate in favor of kernel matrix?
 # include("kernel_matrix.jl")
+
+include("gradient.jl")
 include("gpkernels.jl")
 include("properties.jl")
 
@@ -105,36 +99,6 @@ import LinearAlgebraExtensions: iscov
 iscov(k::MercerKernel, x = randn(32), tol = 1e-10) = iscov(gramian(k, x), tol)
 
 ############################# covariance kernel functions ######################
-import Statistics: var, cov, std
-cov(k::MercerKernel, x::AbstractVector) = gramian(k, x)
-
-# variance (computes diagonal of covariance), should be specialized where
-# more efficient computation is possible
-var(k::MercerKernel) = x->abs(k(x, x))
-std(k::MercerKernel) = x->sqrt(max(zero(eltype(x)), var(k)(x)))
+Statistics.cov(k::MercerKernel, x::AbstractVector) = gramian(k, x)
 
 end # Kernel
-
-## TODO: abstract and general functions for parameter retrieval
-# function parameters(k::AbstractKernel)
-#     n = nparameters(k)
-#     θ = zeros(fieldtype(k), n)
-#     i = 1
-#     for field in fieldnames(typeof(k))
-#         ni = nparameters(k.)
-#         θ[i:i+ni]
-#     end
-#     θ
-# end
-#
-# nparameters(::AbstractFloat) = 1
-# nparameters(::Integer) = 0
-# nparameters(v::AbstractArray) = length(v)
-#
-# function nparameters(k::AbstractKernel)
-#     n = 0
-#     for field in fieldnames(typeof(k))
-#         n += length(k.field)
-#     end
-#     n
-# end
