@@ -1,11 +1,6 @@
 # energetic norm
 enorm(A::AbstractMatOrFac, x::AbstractVector) = sqrt(dot(x, A, x))
 
-# variance (computes diagonal of covariance), should be specialized where
-# more efficient computation is possible
-Statistics.var(k::MercerKernel) = x->abs(k(x, x))
-Statistics.std(k::MercerKernel) = x->sqrt(max(zero(eltype(x)), var(k)(x)))
-
 # TODO: maybe include in and output dimension of kernel in type?
 # this makes it easier to type check admissability of input arguments
 # and differentiate between data vector or vector of data

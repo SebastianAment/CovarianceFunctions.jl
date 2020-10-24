@@ -95,10 +95,4 @@ include("gradient.jl")
 include("gpkernels.jl")
 include("properties.jl")
 
-import LinearAlgebraExtensions: iscov
-iscov(k::MercerKernel, x = randn(32), tol = 1e-10) = iscov(gramian(k, x), tol)
-
-############################# covariance kernel functions ######################
-Statistics.cov(k::MercerKernel, x::AbstractVector) = gramian(k, x)
-
 end # Kernel

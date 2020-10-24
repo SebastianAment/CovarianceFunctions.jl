@@ -1,9 +1,9 @@
 ############################# kernel algebra ###################################
-# TODO: overwrite differentiation, integration
-# TODO: simplify by using traits design, isisotropic, isstationary, ...
-# TODO: then, change from MercerKernel to AbstractKernel, also with traits
-# TODO: separable sum gramian
-# TODO: (Separable) Sum and Product could be one definition with meta programming
+# IDEA: overwrite differentiation, integration
+# IDEA: simplify by using traits design, isisotropic, isstationary, ...
+# then, change from MercerKernel to AbstractKernel, also with traits
+# IDEA: separable sum gramian
+# IDEA: (Separable) Sum and Product could be one definition with meta programming
 ################################ Product #######################################
 # TODO: constructors which merge products and sums
 struct Product{T, AT<:Tuple{Vararg{MercerKernel}}} <: MercerKernel{T}
@@ -209,7 +209,6 @@ nparameters(k::VerticalRescaling) = nparameters(k.k) + nparameters(k.a)
 normalize(k::MercerKernel) = VerticalRescaling(k, x->1/√k(x, x))
 
 ############################## Derivative ######################################
-# TODO: specializations for Isotropic, Stationary?
 struct Derivative{T, K<:MercerKernel{T}} <: MercerKernel{T}
     k::K
 end
@@ -219,13 +218,3 @@ nparameters(k::Derivative) = nparameterks(k.k)
 function (k::Derivative)(x::Real, y::Real)
     FD.derivative(y->FD.derivative(x->k.k(x, y), x), y)
 end
-
-# struct ANOVA{T, K} <: MercerKernel{T}
-#     k::K
-# end
-#
-# function (A::ANOVA)(x, y)
-#     for (i, k) in enumerate(A.k)
-#         k(x[i], y[i])
-#     end
-# end
