@@ -14,10 +14,6 @@ function checklength(x::AbstractArray, y::AbstractArray)
 end
 
 ################################################################################
-function LinearAlgebraExtensions.difference(x::Tuple, y::Tuple)
-     LinearAlgebraExtensions.LazyDifference(x, y)
-end
-
 # matrix of matrices to matrix, useful for testing Gramians of multi-output kernels
 function matmat2mat(A::AbstractMatrix{<:AbstractMatrix})
     n, m = size(A)
