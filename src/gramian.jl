@@ -10,13 +10,17 @@ struct Gramian{T, K, U<:AbstractVector,
     k::K # has to allow k(x[i], y[j]) evaluation ∀i,j
     x::U
     y::V
-    function Gramian(k, x::AbstractVector, y::AbstractVector)
-        T = promote_type(fieldtype.((k, x, y))...)
-        if eltype(k) <: AbstractMatrix
-            T = Matrix{T}
-        end
-        new{T, typeof(k), typeof(x), typeof(y)}(k, x, y)
+end
+function Gramian(k::AbstractKernel, x::AbstractVector, y::AbstractVector)
+    T = promote_type(fieldtype.((k, x, y))...)
+    if eltype(k) <: AbstractMatrix
+        T = Matrix{T}
     end
+    Gramian{T, typeof(k), typeof(x), typeof(y)}(k, x, y)
+end
+function Gramian(k, x::AbstractVector, y::AbstractVector)
+    T = typeof(k(x[1], y[1])) # if we can't directly infer output type, evaluate
+    Gramian{T, typeof(k), typeof(x), typeof(y)}(k, x, y)
 end
 # with euclidean dot product
 Gramian(x::AbstractVector, y::AbstractVector) = Gramian(Kernel.Dot(), x, y)
