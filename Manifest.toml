@@ -65,9 +65,9 @@ version = "0.3.0"
 
 [[Compat]]
 deps = ["Base64", "Dates", "DelimitedFiles", "Distributed", "InteractiveUtils", "LibGit2", "Libdl", "LinearAlgebra", "Markdown", "Mmap", "Pkg", "Printf", "REPL", "Random", "SHA", "Serialization", "SharedArrays", "Sockets", "SparseArrays", "Statistics", "Test", "UUIDs", "Unicode"]
-git-tree-sha1 = "b4f242d5e9f65648d438a03d245a9fdc6e38d728"
+git-tree-sha1 = "a706ff10f1cd8dab94f59fd09c0e657db8e77ff0"
 uuid = "34da2185-b29b-5c13-b0c7-acf172513d20"
-version = "3.22.0"
+version = "3.23.0"
 
 [[CompilerSupportLibraries_jll]]
 deps = ["Artifacts", "JLLWrappers", "Libdl", "Pkg"]
@@ -170,9 +170,9 @@ version = "3.3.9+6"
 
 [[FillArrays]]
 deps = ["LinearAlgebra", "Random", "SparseArrays"]
-git-tree-sha1 = "502b3de6039d5b78c76118423858d981349f3823"
+git-tree-sha1 = "0c667e0749e6b67cc03a1fe705d80a6d737109e6"
 uuid = "1a297f60-69ca-5386-bcde-b61e274b549b"
-version = "0.9.7"
+version = "0.10.0"
 
 [[FixedPointNumbers]]
 deps = ["Statistics"]
@@ -235,9 +235,9 @@ version = "0.8.19"
 
 [[InfiniteArrays]]
 deps = ["DSP", "FillArrays", "LazyArrays", "LinearAlgebra", "Statistics"]
-git-tree-sha1 = "aa50bca542c26505efb399290eb5f83e995517bc"
+git-tree-sha1 = "eccce647e5ed82e1c3d39868ae3868904bf214d4"
 uuid = "4858937d-0d70-526a-a4dd-2d5cb5dd786c"
-version = "0.8.2"
+version = "0.8.3"
 
 [[IniFile]]
 deps = ["Test"]
@@ -284,7 +284,7 @@ version = "0.21.1"
 
 [[KroneckerProducts]]
 deps = ["LazyInverse", "LinearAlgebra", "LinearAlgebraExtensions", "Random", "Test"]
-git-tree-sha1 = "eacddc60f9dcce6798ce77b565b5ad0a8788b8b8"
+git-tree-sha1 = "061bac206b903573bcf32bf646c331fb4f6a37fa"
 repo-rev = "master"
 repo-url = "https://github.com/SebastianAment/KroneckerProducts.jl.git"
 uuid = "1b19e153-50d3-4699-8064-93bcb9fb4fba"
@@ -309,9 +309,9 @@ version = "0.14.1"
 
 [[LazyArrays]]
 deps = ["ArrayLayouts", "FillArrays", "LinearAlgebra", "MacroTools", "MatrixFactorizations", "SparseArrays", "StaticArrays"]
-git-tree-sha1 = "1e9f6f50e6b39b2cabb18d5f0fafdd45d9c2a28f"
+git-tree-sha1 = "db281741191f3c829fbf7e5b0f58a5ea9b017f94"
 uuid = "5078a376-72f3-5289-bfd5-ec5146d43c02"
-version = "0.18.1"
+version = "0.19.0"
 
 [[LazyInverse]]
 deps = ["LinearAlgebra", "Test"]
@@ -373,15 +373,15 @@ uuid = "d6f4376e-aef5-505a-96c1-9c027394607a"
 
 [[MatrixFactorizations]]
 deps = ["ArrayLayouts", "LinearAlgebra", "Random"]
-git-tree-sha1 = "cf040e1d053a83cde01ea964232e0c35a3dbed54"
+git-tree-sha1 = "292e5f9f0761f3511edfb5420b4feadd9ba165b0"
 uuid = "a3b82374-2e81-5b9e-98ce-41277c0e4c87"
-version = "0.6.0"
+version = "0.6.1"
 
 [[MbedTLS]]
 deps = ["Dates", "MbedTLS_jll", "Random", "Sockets"]
-git-tree-sha1 = "426a6978b03a97ceb7ead77775a1da066343ec6e"
+git-tree-sha1 = "1c38e51c3d08ef2278062ebceade0e46cefc96fe"
 uuid = "739be429-bea8-5141-9913-cc70e7f3736d"
-version = "1.0.2"
+version = "1.0.3"
 
 [[MbedTLS_jll]]
 deps = ["Libdl", "Pkg"]
@@ -560,9 +560,9 @@ version = "0.10.3"
 
 [[StaticArrays]]
 deps = ["LinearAlgebra", "Random", "Statistics"]
-git-tree-sha1 = "016d1e1a00fabc556473b07161da3d39726ded35"
+git-tree-sha1 = "da4cf579416c81994afd6322365d00916c79b8ae"
 uuid = "90137ffa-7385-5640-81b9-e52037218182"
-version = "0.12.4"
+version = "0.12.5"
 
 [[Statistics]]
 deps = ["LinearAlgebra", "SparseArrays"]

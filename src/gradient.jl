@@ -8,10 +8,10 @@ struct GradientKernel{T, K} <: MultiKernel{T}
     k::K
     # could add temporary storage for gradient calculation here
 end
+const Gradient = GradientKernel
+const Derivative = GradientKernel
 GradientKernel(k::AbstractKernel{T}) where {T} = GradientKernel{T, typeof(k)}(k)
 
-# compute the (i, j) entry of k(x, y)
-Base.getindex(K::GradientKernel, i::Integer, j::Integer) = (x, y) -> K(x, y)[i, j]
 function elsize(G::Gramian{<:AbstractMatrix, <:GradientKernel}, i::Int)
     return i ≤ 2 ? length(G.x[1]) + 1 : 1
 end
@@ -26,7 +26,7 @@ function (k::GradientKernel)(x::AbstractVector, y::AbstractVector)
 end
 
 function evaluate!(K::AbstractMatrix, g::GradientKernel, x::AbstractVector, y::AbstractVector)
-    function gradient_x(k, x::AbstractVector, y::AbstractVector)
+    function value_gradient(k, x::AbstractVector, y::AbstractVector)
         r = DiffResults.GradientResult(y) # this could take pre-allocated temporary storage
         FD.gradient!(r, z->k(z, y), x)
         vcat(r.value, r.derivs[1]) # d+1 # ... to avoid this
@@ -34,7 +34,7 @@ function evaluate!(K::AbstractMatrix, g::GradientKernel, x::AbstractVector, y::A
     value = @view K[:, 1] # value of helper, i.e. original value and gradient stacked
     derivs = @view K[:, 2:end] # jacobian of helper (higher order terms)
     result = DiffResults.DiffResult(value, derivs)
-    ForwardDiff.jacobian!(result, z->gradient_x(g.k, x, z), y)
+    ForwardDiff.jacobian!(result, z->value_gradient(g.k, x, z), y)
     return K
 end
 
@@ -44,13 +44,14 @@ function (k::GradientKernel)(x::Real, y::Real)
 end
 
 function evaluate!(K::AbstractMatrix, g::GradientKernel, x::Real, y::Real)
-    k = g.k
-    dkx(x, y) = derivative((z)->k(z, y), x) # ∂k/∂x
-    dkxy(x, y) = derivative((z)->dkx(x, z), y) # (∂k/∂x)/∂y = ∂k/(∂x∂y)
-    dky(x, y) = derivative((z)->k(x, z), y) # k(x, y) = k(y, x) -> (∂k/∂x)(x,y)
-    K[1, 1] = k(x, y)
-    K[2, 1] = dkx(x, y)
-    K[1, 2] = dky(x, y)
-    K[2, 2] = dkxy(x, y)
+    function value_derivative(k, x::Real, y::Real)
+        r = DiffResults.DiffResult(zero(y), zero(y)) # this could take pre-allocated temporary storage
+        r = FD.derivative!(r, z->k(z, y), x)
+        vcat(r.value, r.derivs[1])
+    end
+    value = @view K[:, 1] # value of helper, i.e. original value and gradient stacked
+    derivs = @view K[:, 2] # jacobian of helper (higher order terms)
+    result = DiffResults.DiffResult(value, derivs)
+    ForwardDiff.jacobian!(result, z->value_derivative(g.k, x, z[1]), [y])
     return K
 end

@@ -16,58 +16,19 @@ using Statistics
 # type unions we need often:
 using LinearAlgebraExtensions: AbstractMatOrFac
 
-# abstract type Kernel{T, S} end # could have "isscalar" field
-abstract type AbstractKernel{T} end # could be defined by input and output type ...
+abstract type AbstractKernel{T} end
 abstract type MercerKernel{T} <: AbstractKernel{T} end
-# TODO: these should be traits
 abstract type StationaryKernel{T} <: MercerKernel{T} end
 abstract type IsotropicKernel{T} <: StationaryKernel{T} end # ίσος + τρόπος (equal + way)
 
 # class of matrix-valued kernels for multi-output GPs
 abstract type MultiKernel{T} <: AbstractKernel{T} end # MultiKernel
-
-const AllKernels{T} = Union{MercerKernel{T}, MultiKernel{T}}
-
-################################################################################
-# parameters function returns either scalar or recursive vcat of parameter vectors
-# useful for optimization algorithms which require the parameters in vector form
-parameters(::Any) = []
-parameters(::AbstractKernel{T}) where {T} = zeros(T, 0)
-nparameters(::Any) = 0
-
-# checks if θ has the correct number of parameters to initialize a kernel of typeof(k)
-function checklength(k::AbstractKernel, θ::AbstractVector)
-    nt = length(θ)
-    np = nparameters(k)
-    if nt ≠ np
-        throw(DimensionMismatch("length(θ) = $nt ≠ $np = nparameters(k)"))
-    end
-    return nt
-end
-
-# thanks to ffevotte in https://discourse.julialang.org/t/how-to-call-constructor-of-parametric-family-of-types-efficiently/38503/5
-stripped_type(x) = stripped_type(typeof(x))
-stripped_type(typ::DataType) = Base.typename(typ).wrapper
-
-# fallback for zero-parameter kernels
-function Base.similar(k::AbstractKernel, θ::AbstractVector)
-    n = checklength(k, θ)
-    # kernel = eval(Meta.parse(string(typeof(k).name)))
-    kernel = stripped_type(k)
-    if n == 0
-        kernel()
-    elseif n == 1
-        kernel(θ[1])
-    else
-        kernel(θ)
-    end
-end
-
-Base.similar(k::AbstractKernel, θ::Number) = similar(k, [θ])
+# compute the (i, j) entry of k(x, y)
+Base.getindex(K::MultiKernel, i::Integer, j::Integer) = (x, y) -> K(x, y)[i, j]
 
 ################################################################################
 # if we have Matrix valued kernels, this should be different
-Base.eltype(k::AllKernels{T}) where {T} = T
+Base.eltype(k::AbstractKernel{T}) where {T} = T
 Base.eltype(::MultiKernel{T}) where {T} = Matrix{T}
 
 # fieldtype of vector space
@@ -85,14 +46,13 @@ include("mercer.jl") # general mercer kernels
 # include("multi.jl") # multi-output kernels/ kernels for vector-valued functions
 # include("physical.jl") # kernels arising from physical differential equations
 
-# lazy way to represent gramian matrices
-# note: gramian specializations for special matrix structure
-# has to be after definition of all kernels
 include("gramian.jl") # deprecate in favor of kernel matrix?
 # include("kernel_matrix.jl")
 
 include("gradient.jl")
-include("gpkernels.jl")
+include("separable.jl")
+
+# include("gpkernels.jl")
 include("properties.jl")
 
 end # Kernel

@@ -207,14 +207,3 @@ nparameters(k::VerticalRescaling) = nparameters(k.k) + nparameters(k.a)
 
 # normalizes an arbitary kernel so that k(x,x) = 1
 normalize(k::MercerKernel) = VerticalRescaling(k, x->1/√k(x, x))
-
-############################## Derivative ######################################
-struct Derivative{T, K<:MercerKernel{T}} <: MercerKernel{T}
-    k::K
-end
-parameters(k::Derivative) = parameters(k.k)
-nparameters(k::Derivative) = nparameterks(k.k)
-
-function (k::Derivative)(x::Real, y::Real)
-    FD.derivative(y->FD.derivative(x->k.k(x, y), x), y)
-end

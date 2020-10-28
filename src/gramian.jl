@@ -1,10 +1,10 @@
 using ToeplitzMatrices: Circulant, SymmetricToeplitz
 using LinearAlgebraExtensions: vecofvec
 
-############################ Lazy Gramian Matrix ###############################
-# TODO: move to MyLazyArrays?
-# Matrix of inner products,
-# K can be generalized to be any inner product, so not necessarily MercerKernel
+############################ Lazy Kernel Matrix ###############################
+# note: gramian specializations for special matrix structure has to be after definition of all kernels
+# move to MyLazyArrays?
+# K can be any kernel, so not necessarily MercerKernel
 struct Gramian{T, K, U<:AbstractVector,
                 V<:AbstractVector} <: AbstractMatrix{T}
     k::K # has to allow k(x[i], y[j]) evaluation ∀i,j
@@ -50,21 +50,15 @@ function LinearAlgebra.mul!(x::AbstractVecOfVec, G::Gramian{<:Matrix}, y::Abstra
     return x
 end
 
-# TODO: could define algebra
-# import Base:+
-# +(G::Gramian, H::Gramian) = (G.x ≡ H.x && G.y ≡ H.y) ? Gramian(G.k+H.k, x, y) :
-#                     error("cannot add two Gramian matrices with different x or y")
+Base.size(K::Gramian) = (length(K.x), length(K.y))
 
-import Base: size, getindex
-size(K::Gramian) = (length(K.x), length(K.y))
-
-function getindex(G::Gramian, i::Integer, j::Integer)
+function Base.getindex(G::Gramian, i::Integer, j::Integer)
     @boundscheck checkbounds(G, i, j) # add bounds check to G
     @inbounds G.k(G.x[i], G.y[j]) # remove boundscheck of x of x and y
 end
 
 # TODO: should we make this a view?
-function getindex(G::Gramian, i::Union{AbstractArray, Colon},
+function Base.getindex(G::Gramian, i::Union{AbstractArray, Colon},
                                                 j::Union{AbstractArray, Colon})
     @boundscheck checkbounds(G, i, j) # add bounds check to G
     @inbounds gramian(G.k, G.x[i], G.y[j])
