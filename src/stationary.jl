@@ -12,12 +12,14 @@ using LinearAlgebraExtensions: ispsd, difference
 # TODO: Allow Matrix valued constant
 struct Constant{T} <: IsotropicKernel{T}
     c::T
-    function Constant{T}(c::T) where T
-        ispsd(c) || throw(DomainError("Constant is negative: $c"))
-        new{T}(c)
+    function Constant(c, check::Bool = true)
+        if check && !ispsd(c)
+            throw(DomainError("Constant is not positive semi-definite: $c"))
+        end
+        new{typeof(c)}(c)
     end
 end
-Constant(c) = Constant{typeof(c)}(c)
+# Constant(c) = Constant{typeof(c)}(c)
 parameters(k::Constant) = [k.c]
 nparameters(::Constant) = 1
 
@@ -25,10 +27,6 @@ nparameters(::Constant) = 1
 # do we need the isotropic/ stationary evaluation, if we overwrite the mercer one?
 (k::Constant)(τ) = k.c # stationary / isotropic
 (k::Constant)(x, y) = k.c # mercer
-
-# useful?
-# Base.zero(::AbstractKernel{T}) where {T} = Constant(zero(T))
-# Base.one(::AbstractKernel{T}) where {T} = Constant(one(T))
 
 #################### standard exponentiated quadratic kernel ###################
 struct ExponentiatedQuadratic{T} <: IsotropicKernel{T} end
@@ -80,7 +78,6 @@ gramian(::δ{T}, x::AbstractVector) where {T} = (one(T)*I)(length(x))
 ############################ Matern kernel #####################################
 # TODO: use rational types to dispatch to MaternP evaluation, i.e. 5//2 -> MaternP(3)
 # seems k/2 are representable exactly in floating point?
-using SpecialFunctions: gamma, besselk
 struct Matern{T} <: IsotropicKernel{T}
     ν::T
     Matern{T}(ν) where T = (0 < ν) ? new(ν) : throw(DomainError("ν = $ν is negative"))
@@ -155,75 +152,3 @@ struct InverseMultiQuadratic{T} <: IsotropicKernel{T}
     c::T
 end
 (k::InverseMultiQuadratic)(τ::Real) = 1/√(τ^2 + k.c^2)
-
-######################## Kernel Input Transfomations ###########################
-############################ Length Scale ######################################
-# TODO: using meta-programming, could write constructors:
-# EQ(l::Float) = Lengthscale(EQ(), l)
-# for all isotropic kernels?
-struct Lengthscale{T, K} <: StationaryKernel{T}
-    k::K
-    l::T
-    function Lengthscale(k::StationaryKernel, l::Real)
-        0 > l && throw(DomainError("l = $l is non-positive"))
-        S = promote_type(eltype(k), typeof(l))
-        l = convert(S, l)
-        new{S, typeof(k)}(k, l)
-    end
-end
-(k::Lengthscale)(τ::Real) = k.k(τ/k.l)
-isisotropic(k::Lengthscale) = isisotropic(k.k)
-isstationary(k::Lengthscale) = isstationary(k.k)
-
-parameters(k::Lengthscale) = vcat(parameters(k.k), k.l)
-nparameters(k::Lengthscale) = nparameters(k.k) + 1
-function Base.similar(k::Lengthscale, θ::AbstractVector)
-    n = checklength(k, θ)
-    k = similar(k.k, @view(θ[1:n-1]))
-    Lengthscale(k, θ[n])
-end
-
-########################### Change of Input Norm  ##############################
-# apply a different norm to input radius r of a stationary kernel
-# special case of input transformation functional
-struct Normed{T, K<:IsotropicKernel{T}, N} <: StationaryKernel{T}
-    k::K
-    n::N # norm for r call
-end
-
-# TODO: could have a IsotropicNormed kernel if N <: IsotropicNorm
-# currently, only relevant to Lᵖ norm
-(m::Normed)(τ) = m.k(m.n(τ))
-# WARNING: need to define parameters for norm function n (if it has any)
-parameters(k::Normed) = vcat(parameters(k.k), parameters(k.n))
-nparameters(k::Normed) = nparameters(k.k) + nparameters(k.n)
-function Base.similar(k::Normed, θ::AbstractVector)
-    checklength(k, θ)
-    nk = nparameters(k.k)
-    k = similar(k.k, @view(θ[1:nk]))
-    n = similar(k.n, @view(θ[nk+1:end]))
-    Normed(k, n)
-end
-
-# automatic relevance determination with length scale parameters l
-function ARD(k::StationaryKernel, l::AbstractVector{<:Real})
-    f(x) = enorm(Diagonal(inv.(l)), x)
-    Normed(k, f)
-end
-ARD(k::StationaryKernel, l::Real) = Lengthscale(k, l)
-function Energetic(k::StationaryKernel, A::AbstractMatOrFac{<:Real})
-    f(x) = enorm(A, x)
-    Normed(k, f)
-end
-############################ periodic kernel ###################################
-# derived by David MacKay
-# input has to be 1D stationary or isotropic
-struct Periodic{T, K<:StationaryKernel{T}} <: IsotropicKernel{T}
-    k::K
-end
-# squared euclidean distance of x, y in the space (cos(x), sin(x))
-# since τ_new^2 = (cos(x) - cos(y))^2 + (sin(x) - sin(y))^2 = 4*sin((x-y)/2)^2 = 4sin(τ/2)^2
-(p::Periodic)(τ::Real) = p.k(2sin(π*τ)) # without scaling, this is 1-periodic
-parameters(p::Periodic) = parameters(p.k)
-nparameters(p::Periodic) = nparameters(p.k)
-Base.similar(p::Periodic, θ::AbstractVector) = similar(p.k, θ)

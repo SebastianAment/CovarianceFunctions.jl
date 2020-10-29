@@ -1,40 +1,13 @@
 ################################################################################
-# this section automates the construction of parameter-dependent composite kernels
-# parameters function returns either scalar or recursive vcat of parameter vectors
-# useful for optimization algorithms which require the parameters in vector form
-parameters(::Any) = []
-parameters(::AbstractKernel{T}) where {T} = zeros(T, 0)
-nparameters(::Any) = 0
+# if we have Matrix valued kernels, this should be different
+Base.eltype(k::AbstractKernel{T}) where {T} = T
+Base.eltype(::MultiKernel{T}) where {T} = Matrix{T}
 
-# checks if θ has the correct number of parameters to initialize a kernel of typeof(k)
-function checklength(k::AbstractKernel, θ::AbstractVector)
-    nt = length(θ)
-    np = nparameters(k)
-    if nt ≠ np
-        throw(DimensionMismatch("length(θ) = $nt ≠ $np = nparameters(k)"))
-    end
-    return nt
-end
-
-# thanks to ffevotte in https://discourse.julialang.org/t/how-to-call-constructor-of-parametric-family-of-types-efficiently/38503/5
-stripped_type(x) = stripped_type(typeof(x))
-stripped_type(typ::DataType) = Base.typename(typ).wrapper
-
-# fallback for zero-parameter kernels
-function Base.similar(k::AbstractKernel, θ::AbstractVector)
-    n = checklength(k, θ)
-    # kernel = eval(Meta.parse(string(typeof(k).name)))
-    kernel = stripped_type(k)
-    if n == 0
-        kernel()
-    elseif n == 1
-        kernel(θ[1])
-    else
-        kernel(θ)
-    end
-end
-
-Base.similar(k::AbstractKernel, θ::Number) = similar(k, [θ])
+# fieldtype of vector space
+fieldtype(k::AbstractKernel) = eltype(k)
+fieldtype(x) = eltype(x) # base
+fieldtype(x::Union{Tuple, AbstractArray}) = fieldtype(eltype(x))
+# # Base.eltype(T; recursive::Val{true}) = T == eltype(T) ? T : eltype(T, recursive = Val(true))
 
 ################################################################################
 # energetic norm

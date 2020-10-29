@@ -11,6 +11,7 @@ end
 const Gradient = GradientKernel
 const Derivative = GradientKernel
 GradientKernel(k::AbstractKernel{T}) where {T} = GradientKernel{T, typeof(k)}(k)
+GradientKernel(k) = GradientKernel{Float64, typeof(k)}(k) # use fieldtype here?
 
 function elsize(G::Gramian{<:AbstractMatrix, <:GradientKernel}, i::Int)
     return i ≤ 2 ? length(G.x[1]) + 1 : 1
@@ -28,7 +29,7 @@ end
 function evaluate!(K::AbstractMatrix, g::GradientKernel, x::AbstractVector, y::AbstractVector)
     function value_gradient(k, x::AbstractVector, y::AbstractVector)
         r = DiffResults.GradientResult(y) # this could take pre-allocated temporary storage
-        FD.gradient!(r, z->k(z, y), x)
+        ForwardDiff.gradient!(r, z->k(z, y), x)
         vcat(r.value, r.derivs[1]) # d+1 # ... to avoid this
     end
     value = @view K[:, 1] # value of helper, i.e. original value and gradient stacked
@@ -46,7 +47,7 @@ end
 function evaluate!(K::AbstractMatrix, g::GradientKernel, x::Real, y::Real)
     function value_derivative(k, x::Real, y::Real)
         r = DiffResults.DiffResult(zero(y), zero(y)) # this could take pre-allocated temporary storage
-        r = FD.derivative!(r, z->k(z, y), x)
+        r = ForwardDiff.derivative!(r, z->k(z, y), x)
         vcat(r.value, r.derivs[1])
     end
     value = @view K[:, 1] # value of helper, i.e. original value and gradient stacked
