@@ -32,7 +32,7 @@ using LinearAlgebra
     @test parameters(similar(s, [ν, α])) == parameters(s)
     @test similar(eq^2, []) == eq^2
 
-    sym = Kernel.Symmetric(eq, 0.)
+    sym = Kernel.SymmetricKernel(eq, 0.)
     @test similar(sym, randn(1)) isa typeof(sym)
     @test parameters(sym)[] == 0.
     @test nparameters(sym) == 1

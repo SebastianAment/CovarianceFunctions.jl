@@ -25,17 +25,35 @@ end
 # with euclidean dot product
 Gramian(x::AbstractVector, y::AbstractVector) = Gramian(Kernel.Dot(), x, y)
 
+Base.size(K::Gramian) = (length(K.x), length(K.y))
+Base.eltype(G::Gramian{T}) where {T} = T
 # size of an element of a matrix of matrices
 elsize(G::Gramian{<:AbstractMatrix}) = size(G[1,1])
 
+# indexing
+function Base.getindex(G::Gramian, i::Integer, j::Integer)
+    @boundscheck checkbounds(G, i, j) # add bounds check to G
+    @inbounds G.k(G.x[i], G.y[j]) # remove boundscheck of x of x and y
+end
 
-# TODO: + HODLR?
+# TODO: should we make this a view?
+function Base.getindex(G::Gramian, i::Union{AbstractArray, Colon},
+                                                j::Union{AbstractArray, Colon})
+    @boundscheck checkbounds(G, i, j) # add bounds check to G
+    @inbounds gramian(G.k, G.x[i], G.y[j])
+end
+
+# IDEA: + hierarchical matrices?
 function LinearAlgebra.factorize(G::Gramian; check::Bool = true, tol::Real = 1e-12)
-    cholesky(G, Val(true); check = check, tol = tol) # implementation of pivoted cholesky
+    if issymmetric(G) # pivoted cholesky
+        return cholesky(Symmetric(G), Val(true); check = check, tol = tol)
+    else
+        throw("factorize for non-symmetric kernel matrix not implemented")
+    end
 end
 
 const AbstractVecOfVec{T} = AbstractVector{<:AbstractVector{T}}
-# recursivelye calls mul!, thereby avoiding memory allocation of
+# recursively calls mul!, thereby avoiding memory allocation of
 # block-matrix multiplication
 # IDEA: GPU
 function LinearAlgebra.mul!(x::AbstractVecOfVec, G::Gramian{<:Matrix}, y::AbstractVecOfVec)
@@ -50,21 +68,6 @@ function LinearAlgebra.mul!(x::AbstractVecOfVec, G::Gramian{<:Matrix}, y::Abstra
     return x
 end
 
-Base.size(K::Gramian) = (length(K.x), length(K.y))
-
-function Base.getindex(G::Gramian, i::Integer, j::Integer)
-    @boundscheck checkbounds(G, i, j) # add bounds check to G
-    @inbounds G.k(G.x[i], G.y[j]) # remove boundscheck of x of x and y
-end
-
-# TODO: should we make this a view?
-function Base.getindex(G::Gramian, i::Union{AbstractArray, Colon},
-                                                j::Union{AbstractArray, Colon})
-    @boundscheck checkbounds(G, i, j) # add bounds check to G
-    @inbounds gramian(G.k, G.x[i], G.y[j])
-end
-
-Base.eltype(G::Gramian{T}) where {T} = T
 
 # this yields the incorrect result in the rare case that x and y are identical,
 # but are not stored in the same place in memory. The benefit of this is

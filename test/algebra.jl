@@ -11,6 +11,7 @@ using LinearAlgebraExtensions: grid
 using KroneckerProducts: KroneckerProduct
 
 # TODO:
+# test SymmetricKernel
 # test higher input dimensions
 # test type stability
 @testset "stationary kernels" begin

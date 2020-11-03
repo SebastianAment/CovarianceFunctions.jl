@@ -5,7 +5,7 @@ using LinearAlgebra
 using ToeplitzMatrices
 using Kernel: gramian, Gramian
 
-@testset "basic properties" begin
+@testset "Gramian properties" begin
     n = 8
     x = randn(Float64, n)
     k = Kernel.EQ()
@@ -42,6 +42,18 @@ using Kernel: gramian, Gramian
     @test typeof(k(x[1], x[1])) <: eltype(G)
 
     # TODO: MultiKernel test
+end
+
+@testset "Gramian factorization" begin
+    k = Kernel.EQ()
+    n = 64
+    x = randn(n)
+    G = gramian(k, x)
+    F = factorize(G)
+    @test F isa CholeskyPivoted
+    @test issuccess(F)
+    @test rank(F) < n ÷ 2 # this should be very low rank
+    @test isapprox(Matrix(F), G, atol = 1e-8)
 end
 
 @testset "toeplitz structure" begin

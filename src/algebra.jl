@@ -161,26 +161,25 @@ function separable(::typeof(^), k::MercerKernel, d::Integer)
 end
 
 ######################## Kernel Input Transfomations ###########################
-############################## symmetric kernel ################################
+############################ Symmetric Kernel ##################################
 # make this useable for multi-dimensional inputs!
 # in more dimensions, could have more general axis of symmetry
-struct Symmetric{T, K<:MercerKernel} <: MercerKernel{T}
+struct SymmetricKernel{T, K<:MercerKernel} <: MercerKernel{T}
     k::K # kernel to be symmetrized
     z::T # center
 end
-parameters(k::Symmetric) = vcat(parameters(k.k), k.z)
-nparameters(k::Symmetric) = nparameters(k.k) + 1
-function Base.similar(k::Symmetric, θ::AbstractVector)
+parameters(k::SymmetricKernel) = vcat(parameters(k.k), k.z)
+nparameters(k::SymmetricKernel) = nparameters(k.k) + 1
+function Base.similar(k::SymmetricKernel, θ::AbstractVector)
     n = checklength(k, θ)
     k = similar(k.k, @view(θ[1:n-1]))
-    Symmetric(k, θ[n])
+    SymmetricKernel(k, θ[n])
 end
-
 # const Sym = Symmetric
-Symmetric(k::MercerKernel{T}) where T = Symmetric(k, zero(T))
+SymmetricKernel(k::MercerKernel{T}) where T = SymmetricKernel(k, zero(T))
 
 # for 1D axis symmetry
-function (k::Symmetric)(x, y)
+function (k::SymmetricKernel)(x, y)
     x -= k.z; y -= k.z;
     k.k(x, y) + k.k(-x, y)
 end

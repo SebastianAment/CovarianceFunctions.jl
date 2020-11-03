@@ -40,7 +40,11 @@ function matmat2mat(A::AbstractMatrix{<:AbstractMatrix})
         for i in 1:n
             ind = (i-1)*ni+1 : i*ni
             Bij = @view B[ind, jnd]
-            copyto!(Bij, A[i, j])
+            Aij = A[i, j]
+            if Aij isa Factorization
+                Aij = Matrix(Aij)
+            end
+            copyto!(Bij, Aij)
         end
     end
     return B
