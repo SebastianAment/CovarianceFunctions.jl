@@ -23,8 +23,8 @@ using Kernel: gramian, Gramian
     @test !isposdef(G) && !isposdef(M)
 
     G = gramian(k, x, copy(x))
-    @test !issymmetric(G) #&& !issymmetric(M)
-    @test !isposdef(G) #&& !isposdef(M)
+    @test issymmetric(G) # testing that value check also works
+    @test isposdef(G)
 
     # testing standard Gramian
     G = Gramian(x, x)
@@ -53,6 +53,17 @@ end
     @test F isa CholeskyPivoted
     @test issuccess(F)
     @test rank(F) < n ÷ 2 # this should be very low rank
+    @test isapprox(Matrix(F), G, atol = 1e-8)
+
+    F = cholesky(G)
+    @test F isa CholeskyPivoted
+    @test isapprox(Matrix(F), G, atol = 1e-8)
+
+    # regular cholesky
+    k = Kernel.Exponential() # does not yield low rank matrix
+    G = gramian(k, x)
+    F = cholesky(G, Val(false))
+    @test F isa Cholesky
     @test isapprox(Matrix(F), G, atol = 1e-8)
 end
 

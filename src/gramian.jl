@@ -43,15 +43,6 @@ function Base.getindex(G::Gramian, i::Union{AbstractArray, Colon},
     @inbounds gramian(G.k, G.x[i], G.y[j])
 end
 
-# IDEA: + hierarchical matrices?
-function LinearAlgebra.factorize(G::Gramian; check::Bool = true, tol::Real = 1e-12)
-    if issymmetric(G) # pivoted cholesky
-        return cholesky(Symmetric(G), Val(true); check = check, tol = tol)
-    else
-        throw("factorize for non-symmetric kernel matrix not implemented")
-    end
-end
-
 const AbstractVecOfVec{T} = AbstractVector{<:AbstractVector{T}}
 # recursively calls mul!, thereby avoiding memory allocation of
 # block-matrix multiplication
@@ -68,13 +59,12 @@ function LinearAlgebra.mul!(x::AbstractVecOfVec, G::Gramian{<:Matrix}, y::Abstra
     return x
 end
 
-
-# this yields the incorrect result in the rare case that x and y are identical,
-# but are not stored in the same place in memory. The benefit of this is
-# that is can be computed in constant time
-LinearAlgebra.issymmetric(G::Gramian) = G.x ≡ G.y
-LinearAlgebra.isposdef(G::Gramian) = issymmetric(G)
+LinearAlgebra.issymmetric(G::Gramian) = (G.x ≡ G.y) || (G.x == G.y) # pointer check is constant time
+LinearAlgebra.issymmetric(G::Gramian{<:Real, <:Constant}) = true
 LinearAlgebra.ishermitian(G::Gramian) = issymmetric(G)
+function LinearAlgebra.isposdef(G::Gramian)
+    return typeof(G.k) <: Union{MercerKernel, MultiKernel} && issymmetric(G)
+end
 
 ######################### smart pseudo-constructor #############################
 # standard approach is a lazily represented kernel matrix
@@ -90,37 +80,32 @@ function gramian(k, x::AbstractMatrix, y::AbstractMatrix)
     gramian(k, vecofvec(x), vecofvec(y))
 end
 
-# to project vectors into the RKHS formed by k on x
-# import LinearAlgebraExtensions: Projection
-# Projection(k, x::AbstractVector) = Projection(gramian(k, x))
-
-# this has to be done lazily to preserve structure
-# gramian(k::VerticalRescaling, x) = Diagonal(k.f.(x)) * marginal(k.k, x) * Diagonal(k.f.(x))
-# only be lazy if there is special structure (StepRangeLen)
-# function gramian(k::VerticalRescaling{<:Real, <:StationaryKernel}, x::StepRangeLen)
-#     LazySymmetricRescaling(Diagonal(k.a.(x)), marginal(k.k, x))
-# end
-
-# could have lazy ones matrix, not sure if relevant
-# gramian(k::Constant, x) = k.c * ones(eltype(x), (length(x), length(x))) # fill array?
-
-# 1D statonary kernel on equi-spaced grid gives rise to toeplitz structure
-# have to change the cholesky call
-# function gramian(k::StationaryKernel, x::StepRangeLen{<:Real}, ::Val{false} = Val(false))
-#     SymmetricToeplitz(k.(x[1], x)) # return as CovarianceMatrix?
-# end
-
-# import Base: +
-# function +(T::SymmetricToeplitz, D::UniformScaling)
-#     vc = copy(T.vc)
-#     vc[1] += D.λ
-#     SymmetricToeplitz(vc)
-# end
-
-# gramian(k::StationaryKernel, x::StepRangeLen{<:Real}, y::StepRangeLen{<:Real},
-#                     ::Val{false} = Val(false)) = SymmetricToeplitz(k.(x[1], y))
-
-
 # 1D stationary kernel on equi-spaced grid with periodic boundary conditions
-gramian(k::StationaryKernel, x::StepRangeLen{<:Real},
-                            ::Val{true}) = Circulant(k.(x[1], x))
+function gramian(k::StationaryKernel, x::StepRangeLen{<:Real}, ::Val{true})
+    return Circulant(k.(x[1], x))
+end
+
+###################### factorization of Gramian ################################
+# IDEA: + hierarchical matrices?
+# factorization of Gramian defaults to pivoted Cholesky factorization to exploit low-rank structure
+function LinearAlgebra.cholesky(G::Gramian, ::Val{true} = Val(true);
+                                check::Bool = true, tol::Real = 1e-12)
+    if issymmetric(G) # pivoted cholesky
+        return cholesky(Symmetric(G), Val(true); check = check, tol = tol)
+    else
+        throw("factorize for non-symmetric kernel matrix not implemented")
+    end
+end
+# regular (non-pivoted) cholesky
+function LinearAlgebra.cholesky(G::Gramian, ::Val{false}; check::Bool = true)
+    if issymmetric(G) # cholesky
+        return cholesky(Symmetric(G), Val(false); check = check)
+    else
+        throw("factorize for non-symmetric kernel matrix not implemented")
+    end
+end
+# IDEA: could decide whether or not to apply pivoted cholesky depending on
+# kernel type and input dimension
+function LinearAlgebra.factorize(G::Gramian; check::Bool = true, tol::Real = 1e-12)
+    return cholesky(G, Val(true), check = check, tol = tol)
+end

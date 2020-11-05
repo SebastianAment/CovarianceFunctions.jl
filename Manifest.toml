@@ -206,7 +206,7 @@ uuid = "37e2e46d-f89d-539d-b4ee-838fcccc9c8e"
 
 [[LinearAlgebraExtensions]]
 deps = ["FFTW", "InfiniteArrays", "LazyArrays", "LazyInverse", "LinearAlgebra", "StatsBase", "Test"]
-git-tree-sha1 = "3ff02b1131ce6f7253546f0ec7b707ad651d2a46"
+git-tree-sha1 = "b88443ee1428a9a2759fd766f1aa1bfe727af2b6"
 repo-rev = "master"
 repo-url = "https://github.com/SebastianAment/LinearAlgebraExtensions.jl.git"
 uuid = "cb114d4a-f1bd-499c-ad9e-7f2ed74575b9"
