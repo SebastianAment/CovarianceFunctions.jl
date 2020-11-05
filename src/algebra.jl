@@ -1,14 +1,11 @@
 ############################# kernel algebra ###################################
-# IDEA: overwrite differentiation, integration
-# IDEA: simplify by using traits design, isisotropic, isstationary, ...
-# then, change from MercerKernel to AbstractKernel, also with traits
 # IDEA: separable sum gramian
 # IDEA: (Separable) Sum and Product could be one definition with meta programming
 ################################ Product #######################################
 # TODO: constructors which merge products and sums
-struct Product{T, AT<:Tuple{Vararg{MercerKernel}}} <: MercerKernel{T}
+struct Product{T, AT<:Tuple{Vararg{AbstractKernel}}} <: AbstractKernel{T}
     args::AT
-    function Product(k::Tuple{Vararg{MercerKernel}})
+    function Product(k::Tuple{Vararg{AbstractKernel}})
         T = promote_type(eltype.(k)...)
         new{T, typeof(k)}(k)
     end
@@ -16,35 +13,24 @@ end
 (P::Product)(τ) = prod(k->k(τ), P.args) # TODO could check for isotropy here
 (P::Product)(x, y) = prod(k->k(x, y), P.args)
 # (P::Product)(x, y) = isstationary(P) ? P(difference(x, y)) : prod(k->k(x, y), P.args)
-Product(k::MercerKernel...) = Product(k)
+Product(k::AbstractKernel...) = Product(k)
 Product(k::AbstractVector{<:AbstractKernel}) = Product(k...)
 Base.prod(k::AbstractVector{<:AbstractKernel}) = Product(k)
 
-Base.:*(k::MercerKernel...) = Product(k)
-Base.:*(c::Number, k::MercerKernel) = Constant(c) * k
-Base.:*(k::MercerKernel, c::Number) = Constant(c) * k
+Base.:*(k::AbstractKernel...) = Product(k)
+Base.:*(c::Number, k::AbstractKernel) = Constant(c) * k
+Base.:*(k::AbstractKernel, c::Number) = Constant(c) * k
 
 parameters(k::Product) = vcat(parameters.(k.args)...)
 nparameters(k::Product) = sum(nparameters, k.args)
 function Base.similar(k::Product, θ::AbstractVector)
-    Product(_similar_helper(k, θ))
-end
-
-function _similar_helper(k, θ)
-    checklength(k, θ)
-    args = Vector{AbstractKernel}(undef, length(k.args))
-    for (i, k) in enumerate(k.args)
-        n = nparameters(k)
-        args[i] = similar(k, @view(θ[1:n]))
-        θ = @view(θ[n+1:end])
-    end
-    args
+    return Product(_similar_helper(k, θ))
 end
 
 ################################### Sum ########################################
-struct Sum{T, AT<:Tuple{Vararg{MercerKernel}}} <: MercerKernel{T}
+struct Sum{T, AT<:Tuple{Vararg{AbstractKernel}}} <: AbstractKernel{T}
     args::AT
-    function Sum(k::Tuple{Vararg{MercerKernel}})
+    function Sum(k::Tuple{Vararg{AbstractKernel}})
         T = promote_type(eltype.(k)...)
         new{T, typeof(k)}(k)
     end
@@ -53,13 +39,13 @@ end
 (S::Sum)(x, y) = sum(k->k(x, y), S.args)
 # (S::Sum)(τ) = isstationary(S) ? sum(k->k(τ), S.args) : error("One argument evaluation not possible for non-stationary kernel")
 # (S::Sum)(x, y) = isstationary(S) ? S(difference(x, y)) : sum(k->k(x, y), S.args)
-Sum(k::MercerKernel...) = Sum(k)
+Sum(k::AbstractKernel...) = Sum(k)
 Sum(k::AbstractVector{<:AbstractKernel}) = Sum(k...)
 Base.sum(k::AbstractVector{<:AbstractKernel}) = Sum(k)
 
-Base.:+(k::MercerKernel...) = Sum(k)
-Base.:+(k::MercerKernel, c::Number) = k + Constant(c)
-Base.:+(c::Number, k::MercerKernel) = k + Constant(c)
+Base.:+(k::AbstractKernel...) = Sum(k)
+Base.:+(k::AbstractKernel, c::Number) = k + Constant(c)
+Base.:+(c::Number, k::AbstractKernel) = k + Constant(c)
 
 parameters(k::Sum) = vcat(parameters.(k.args)...)
 nparameters(k::Sum) = sum(nparameters, k.args)
@@ -67,17 +53,17 @@ nparameters(k::Sum) = sum(nparameters, k.args)
 # constructs similar object to k, but with different values θ
 # overloading similar from Base
 function Base.similar(k::Sum, θ::AbstractVector)
-    Sum(_similar_helper(k, θ))
+    return Sum(_similar_helper(k, θ))
 end
 
 ################################## Power #######################################
-struct Power{T, K<:MercerKernel{T}} <: MercerKernel{T}
+struct Power{T, K<:AbstractKernel{T}} <: AbstractKernel{T}
     k::K
     p::Int
 end
 (P::Power)(τ) = P.k(τ)^P.p
 (P::Power)(x, y) = P.k(x, y)^P.p
-Base.:^(k::MercerKernel, p::Int) = Power(k, p)
+Base.:^(k::AbstractKernel, p::Int) = Power(k, p)
 parameters(k::Power) = parameters(k.k)
 nparameters(k::Power) = nparameters(k.k)
 function Base.similar(k::Power, θ::AbstractVector)
@@ -86,11 +72,10 @@ end
 
 ############################ Separable Product #################################
 using LinearAlgebraExtensions: LazyGrid, grid
-# TODO: this could subsume Separable in multi
 # product kernel, but separately evaluates component kernels on different parts of the input
-struct SeparableProduct{T, K<:Tuple{Vararg{MercerKernel}}} <: MercerKernel{T}
+struct SeparableProduct{T, K<:Tuple{Vararg{AbstractKernel}}} <: AbstractKernel{T}
     args::K # kernel for input covariances
-    function SeparableProduct(k::Tuple{Vararg{MercerKernel}})
+    function SeparableProduct(k::Tuple{Vararg{AbstractKernel}})
         T = promote_type(eltype.(k)...)
         new{T, typeof(k)}(k)
     end
@@ -123,9 +108,9 @@ end
 # and take elementwise product. Might lead to efficiency gains
 ############################### Separable Sum ##################################
 # what about separable sums? do they give rise to kronecker sums? yes!
-struct SeparableSum{T, K<:Tuple{Vararg{MercerKernel}}} <: MercerKernel{T}
+struct SeparableSum{T, K<:Tuple{Vararg{AbstractKernel}}} <: AbstractKernel{T}
     args::K # kernel for input covariances
-    function SeparableSum(k::Tuple{Vararg{MercerKernel}})
+    function SeparableSum(k::Tuple{Vararg{AbstractKernel}})
         T = promote_type(eltype.(k)...)
         new{T, typeof(k)}(k)
     end
@@ -153,10 +138,10 @@ end
 
 # convenient constructor
 # e.g. separable(*, k1, k2)
-separable(::typeof(*), k::MercerKernel...) = SeparableProduct(k)
-separable(::typeof(+), k::MercerKernel...) = SeparableSum(k)
+separable(::typeof(*), k::AbstractKernel...) = SeparableProduct(k)
+separable(::typeof(+), k::AbstractKernel...) = SeparableSum(k)
 # d-separable product of k
-function separable(::typeof(^), k::MercerKernel, d::Integer)
+function separable(::typeof(^), k::AbstractKernel, d::Integer)
     SeparableProduct(tuple((k for _ in 1:d)...))
 end
 
@@ -164,7 +149,7 @@ end
 ############################ Symmetric Kernel ##################################
 # make this useable for multi-dimensional inputs!
 # in more dimensions, could have more general axis of symmetry
-struct SymmetricKernel{T, K<:MercerKernel} <: MercerKernel{T}
+struct SymmetricKernel{T, K<:AbstractKernel} <: AbstractKernel{T}
     k::K # kernel to be symmetrized
     z::T # center
 end
@@ -176,7 +161,7 @@ function Base.similar(k::SymmetricKernel, θ::AbstractVector)
     SymmetricKernel(k, θ[n])
 end
 # const Sym = Symmetric
-SymmetricKernel(k::MercerKernel{T}) where T = SymmetricKernel(k, zero(T))
+SymmetricKernel(k::AbstractKernel{T}) where T = SymmetricKernel(k, zero(T))
 
 # for 1D axis symmetry
 function (k::SymmetricKernel)(x, y)
@@ -189,7 +174,7 @@ end
 # TODO: should be called DiagonalRescaling in analogy to the matrix case
 # diagonal rescaling of covariance functions
 # generalizes multiplying by constant kernel to multiplying by function
-struct VerticalRescaling{T, K<:MercerKernel{T}, F} <: MercerKernel{T}
+struct VerticalRescaling{T, K<:AbstractKernel{T}, F} <: AbstractKernel{T}
     k::K
     a::F
 end
@@ -205,4 +190,4 @@ nparameters(k::VerticalRescaling) = nparameters(k.k) + nparameters(k.a)
 # end
 
 # normalizes an arbitary kernel so that k(x,x) = 1
-normalize(k::MercerKernel) = VerticalRescaling(k, x->1/√k(x, x))
+normalize(k::AbstractKernel) = VerticalRescaling(k, x->1/√k(x, x))

@@ -1,6 +1,5 @@
 ############################ stationary kernels ################################
 using LinearAlgebraExtensions: ispsd, difference
-
 # notation:
 # x, y inputs
 # τ = x-y difference
@@ -19,6 +18,8 @@ struct Constant{T} <: IsotropicKernel{T}
         new{typeof(c)}(c)
     end
 end
+# isisotropic(::Constant) = true
+# ismercer(k::Constant) = ispsd(k.c)
 # Constant(c) = Constant{typeof(c)}(c)
 parameters(k::Constant) = [k.c]
 nparameters(::Constant) = 1

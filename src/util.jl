@@ -73,7 +73,7 @@ end
 
 # tests if k is stationary on finite set of points x
 # need to make this multidimensional
-function isstationary(k::MercerKernel, x::AbstractVector)
+function isstationary(k::AbstractKernel, x::AbstractVector)
     n = length(x)
     d = length(x[1])
     is_stationary = true

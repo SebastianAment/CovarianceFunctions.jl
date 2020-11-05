@@ -2,7 +2,7 @@ module TestAlgebra
 
 using Test
 using LinearAlgebra
-using Kernel: MercerKernel, IsotropicKernel, isstationary
+using Kernel: AbstractKernel, IsotropicKernel, ismercer, isstationary, isisotropic
 
 using Kernel
 using Kernel: Constant, EQ, RQ, Exp, γExp, Delta, Cosine, MaternP, Matern#, SM
@@ -20,8 +20,8 @@ using KroneckerProducts: KroneckerProduct
     k2 = Matern(5*rand())
     k3 = Kernel.Dot()
 
-    @test typeof(k1 * k3) <: MercerKernel
-
+    @test typeof(k1 * k3) <: AbstractKernel
+    @test ismercer(k1 * k3)
     # evaluations
     x = randn()
     y = randn()
@@ -66,7 +66,6 @@ using KroneckerProducts: KroneckerProduct
     # d = 1
     # x = randn(T, n)
     # Σ = zeros(T, (n, n))
-
 end
 
 @testset "separable kernels" begin
