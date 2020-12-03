@@ -166,7 +166,7 @@ SymmetricKernel(k::AbstractKernel{T}) where T = SymmetricKernel(k, zero(T))
 # for 1D axis symmetry
 function (k::SymmetricKernel)(x, y)
     x -= k.z; y -= k.z;
-    k.k(x, y) + k.k(-x, y)
+    (k.k(x, y) + k.k(-x, y))/2
 end
 
 ######################## Kernel output transformations #########################
