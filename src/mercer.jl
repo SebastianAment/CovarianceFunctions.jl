@@ -19,8 +19,6 @@ end
 ############################ Brownian kernel ###################################
 # technically stationary increments ...
 struct Brownian{T} <: MercerKernel{T} end
-# squared euclidean distance of x, y in the space (cos(x), sin(x))
-# since (cos(x) - cos(y))^2 + (sin(x) - sin(y))^2 = 4*sin((x-y)/2)^2
 (k::Brownian)(x::Real, y::Real) = min(x, y)
 
 # NN(σ) = π/2 * (asin ∘ (Line(σ) / x->√(1+dot(x,x))))
@@ -63,30 +61,6 @@ function gramian(k::FiniteBasis, x::AbstractVector, y::AbstractVector)
     end
 end
 
-########################### polynomial kernel ##################################
-# is a composition of Dot + Power kernels
-# struct Poly{T} <: MercerKernel{T}
-#     σ::T
-#     d::Int
-#     function Poly{T}(σ, d) where T
-#         if d < 0
-#             error("degree negative")
-#         elseif σ < 0
-#             error("σ negative")
-#         end
-#         new(σ, d)
-#     end
-# end
-#
-# Poly{T}(d::Int) where T = Poly(T(0), d)
-# Poly(d::Int) = Poly{Float64}(d)
-#
-# # as a function of the inner product xy (could be generalized)
-# (k::Poly)(xy::Real) = (xy + k.σ)^k.d
-# (k::Poly)(x::RTV, y::RTV) = k(dot(x, y))
-# again this is a composition of simpler kernels: Power(Sum(Dot, Const), p)
-# Poly(d, σ) = (Dot() + σ)^d
-
 ########################### neural network kernel ##############################
 struct NeuralNetwork{T} <: MercerKernel{T}
     σ::T # have to restrict to be positive
@@ -99,25 +73,9 @@ NN() = NN{Float64}(0.)
 
 function (k::NN)(x, y)
     l = Line(k.σ)
-    2/π * asin(l(x,y) / sqrt((1+l(x,x)) * (1+l(y,y))))
+    2/π * asin(l(x, y) / sqrt((1 + l(x, x)) * (1 + l(y, y))))
 end
 
 ########################## more future additions ###############################
-# TODO: Deep neural network kernel, convolutional NN kernel,
+# IDEA: Deep neural network kernel, convolutional NN kernel,
 # Gibbs non-stationary construction etc.
-
-
-############## kernel on subselection of input coordinates #####################
-# struct Subselect{T, K<:MercerKernel{T}, TU<:Tuple}
-#     k::K
-#     ind::TU
-# end
-#
-# function (k::Subselect{T})(x::T, y::T) where {T}
-#     return k.k(x[ind], y[ind])
-# end
-
-# deprecated
-# @inline _line(x, y, σ) = 2dot(x,y) + σ
-# @inline _NN(x, y, σ) =  2/π * asin((_line(x,y,σ)) / sqrt((1+_line(x,x,σ)) * (1+_line(y,y,σ))))
-# (k::NN)(x::T, y::T) where {T<:RTV} = _NN(x, y, k.σ)
