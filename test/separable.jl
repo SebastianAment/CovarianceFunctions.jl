@@ -1,10 +1,10 @@
 module TestSeparable
 using Test
-using Kernel
-using Kernel: Separable, matmat2mat
+using CovarianceFunctions
+using CovarianceFunctions: Separable, matmat2mat
 using LinearAlgebra
 using KroneckerProducts
-k = Kernel.EQ()
+k = CovarianceFunctions.EQ()
 @testset "SeparableKernel" begin
     d = 3
     B = randn(d, d)
@@ -16,7 +16,7 @@ k = Kernel.EQ()
 
     n = 3
     x = randn(n)
-    K = Kernel.gramian(G, x)
+    K = CovarianceFunctions.gramian(G, x)
     @test issymmetric(K)
     @test isposdef(K)
     @test size(K) == (n, n)

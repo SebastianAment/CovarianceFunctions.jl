@@ -1,11 +1,11 @@
 module TestMercer
 
 using Test
-using Kernel: iscov
+using CovarianceFunctions: iscov
 using LinearAlgebra
 
 @testset "promotion" begin
-    using Kernel: Dot, Poly, NN
+    using CovarianceFunctions: Dot, Poly, NN
     k_arr = [Dot(), Poly(3), NN()]
     k_strings = ["Dot", "Poly", "NN"]
     for (k, str) in zip(k_arr, k_strings)
@@ -14,7 +14,7 @@ using LinearAlgebra
 end
 
 @testset "mercer" begin
-    using Kernel: FiniteBasis, gramian, Gramian
+    using CovarianceFunctions: FiniteBasis, gramian, Gramian
     using LinearAlgebraExtensions: LowRank
 
     basis = [sin, cos, identity]
@@ -30,14 +30,14 @@ end
 #     @test
 # end
 #
-# using Kernel: Product, Sum, Power, VerticalRescaling
-# @testset "Kernel Algebra" begin
+# using CovarianceFunctions: Product, Sum, Power, VerticalRescaling
+# @testset "CovarianceFunctions Algebra" begin
 #     k = [Dot, Poly, NN]
 #     @test
 # end
 #
 # using RescaledMetric, Periodic, Sym, Conditional, SoR
-# @testset "Kernel Modification" begin
+# @testset "CovarianceFunctions Modification" begin
 #     k = [Dot, Poly, NN]
 #     @test
 # end
@@ -49,14 +49,14 @@ end
 
 #
 # # projection onto symmetric matrices: A -> (A' + A)/2
-# # testing if the rescaled kernel is numerically stable
+# # testing if the rescaled CovarianceFunctions is numerically stable
 # function test(k::K, b::T = T(1), n::Int = 1024) where {T, K<:Rescaled{T}}
 #     ε = eps(T) # numerical precision of type
 #     x = 2b * rand(n) .- b # randomly sample in range
 #     ax = k.a.(x)
 #     cond = maximum(ax) / minimum(ax)
 #     if cond > sqrt(1/ε)
-#         println("Warning: Currently specified Rescaled kernel leads to ill-conditioned GP inference. To avoid this, we added 1e-6 to your rescaling function.")
+#         println("Warning: Currently specified Rescaled CovarianceFunctions leads to ill-conditioned GP inference. To avoid this, we added 1e-6 to your rescaling function.")
 #         f(x) = k.a(x) + T(1e-6)
 #         return K(k.k, f)
 #     end

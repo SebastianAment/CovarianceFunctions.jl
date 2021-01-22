@@ -23,7 +23,7 @@ function Gramian(k, x::AbstractVector, y::AbstractVector)
     Gramian{T, typeof(k), typeof(x), typeof(y)}(k, x, y)
 end
 # with euclidean dot product
-Gramian(x::AbstractVector, y::AbstractVector) = Gramian(Kernel.Dot(), x, y)
+Gramian(x::AbstractVector, y::AbstractVector) = Gramian(Dot(), x, y)
 
 Base.size(K::Gramian) = (length(K.x), length(K.y))
 Base.eltype(G::Gramian{T}) where {T} = T

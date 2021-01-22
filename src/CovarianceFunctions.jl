@@ -1,5 +1,4 @@
-module Kernel
-# KernelFunctions
+module CovarianceFunctions
 
 using LinearAlgebra
 using ForwardDiff

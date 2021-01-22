@@ -1,10 +1,10 @@
 module TestGradient
 using Test
-using Kernel
-using Kernel: GradientKernel, matmat2mat
+using CovarianceFunctions
+using CovarianceFunctions: GradientKernel, matmat2mat
 using LinearAlgebra
 
-k = Kernel.EQ()
+k = CovarianceFunctions.EQ()
 @testset "GradientKernel" begin
     G = GradientKernel(k)
 
@@ -12,7 +12,7 @@ k = Kernel.EQ()
     n = 3
     x = randn(n)
 
-    K = Kernel.gramian(G, x)
+    K = CovarianceFunctions.gramian(G, x)
     @test issymmetric(K)
     @test isposdef(K)
     @test size(K) == (n, n)
@@ -24,7 +24,7 @@ k = Kernel.EQ()
     n = 2
     d = 1
     x = [randn(d) for _ in 1:n]
-    K = Kernel.gramian(G, x)
+    K = CovarianceFunctions.gramian(G, x)
     @test K isa AbstractMatrix{<:Matrix}
 
     MK = matmat2mat(K)

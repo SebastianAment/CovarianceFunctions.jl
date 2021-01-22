@@ -68,8 +68,8 @@ struct NeuralNetwork{T} <: MercerKernel{T}
 end
 const NN = NeuralNetwork
 
-# NN{T}(σ::T = zero(T)) where {T} = NN(σ)
-NN() = NN{Float64}(0.)
+# NN{T}(σ::T = one(T)) where {T} = NN(σ)
+NN() = NN{Float64}(1.)
 
 function (k::NN)(x, y)
     l = Line(k.σ)

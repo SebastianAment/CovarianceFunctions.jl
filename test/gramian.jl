@@ -1,14 +1,14 @@
 module TestGramian
-using Kernel
+using CovarianceFunctions
 using Test
 using LinearAlgebra
 using ToeplitzMatrices
-using Kernel: gramian, Gramian
+using CovarianceFunctions: gramian, Gramian
 
 @testset "Gramian properties" begin
     n = 8
     x = randn(Float64, n)
-    k = Kernel.EQ()
+    k = CovarianceFunctions.EQ()
     G = gramian(k, x)
 
     @test issymmetric(G)
@@ -31,7 +31,7 @@ using Kernel: gramian, Gramian
     @test G ≈ dot.(x, x')
 
     x = randn(Float64, n)
-    k = Kernel.EQ{Float32}()
+    k = CovarianceFunctions.EQ{Float32}()
     G = gramian(k, x)
     # type promotion
     @test typeof(k(x[1], x[1])) <: typeof(G[1,1]) # test promotion in inner constructor
@@ -45,7 +45,7 @@ using Kernel: gramian, Gramian
 end
 
 @testset "Gramian factorization" begin
-    k = Kernel.EQ()
+    k = CovarianceFunctions.EQ()
     n = 64
     x = randn(n)
     G = gramian(k, x)
@@ -60,7 +60,7 @@ end
     @test isapprox(Matrix(F), G, atol = 1e-8)
 
     # regular cholesky
-    k = Kernel.Exponential() # does not yield low rank matrix
+    k = CovarianceFunctions.Exponential() # does not yield low rank matrix
     G = gramian(k, x)
     F = cholesky(G, Val(false))
     @test F isa Cholesky
@@ -70,7 +70,7 @@ end
 @testset "toeplitz structure" begin
     n = 16
     x = -1:.1:1
-    k = Kernel.EQ()
+    k = CovarianceFunctions.EQ()
     m = gramian(k, x)
     # @test typeof(m) <: SymmetricToeplitz
     m = gramian(k, x, Val(true)) # periodic boundary conditions

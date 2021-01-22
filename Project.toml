@@ -1,6 +1,6 @@
-name = "Kernel"
+name = "CovarianceFunctions"
 uuid = "b3329135-7958-41d4-bb02-e084c5a526bf"
-authors = ["sebastianament "]
+authors = ["sebastianament"]
 version = "0.1.0"
 
 [deps]

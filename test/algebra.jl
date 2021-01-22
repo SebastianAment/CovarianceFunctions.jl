@@ -2,11 +2,11 @@ module TestAlgebra
 
 using Test
 using LinearAlgebra
-using Kernel: AbstractKernel, IsotropicKernel, ismercer, isstationary, isisotropic
+using CovarianceFunctions: AbstractKernel, IsotropicKernel, ismercer, isstationary, isisotropic
 
-using Kernel
-using Kernel: Constant, EQ, RQ, Exp, γExp, Delta, Cosine, MaternP, Matern#, SM
-using Kernel: separable, gramian
+using CovarianceFunctions
+using CovarianceFunctions: Constant, EQ, RQ, Exp, γExp, Delta, Cosine, MaternP, Matern#, SM
+using CovarianceFunctions: separable, gramian
 using LinearAlgebraExtensions: grid
 using KroneckerProducts: KroneckerProduct
 
@@ -18,7 +18,7 @@ using KroneckerProducts: KroneckerProduct
 
     k1 = EQ()
     k2 = Matern(5*rand())
-    k3 = Kernel.Dot()
+    k3 = CovarianceFunctions.Dot()
 
     @test typeof(k1 * k3) <: AbstractKernel
     @test ismercer(k1 * k3)
@@ -69,9 +69,9 @@ using KroneckerProducts: KroneckerProduct
 end
 
 @testset "separable kernels" begin
-    k = Kernel.EQ()
+    k = CovarianceFunctions.EQ()
     k = separable(*, k, k, k)
-    h = separable(^, Kernel.EQ(), 3)
+    h = separable(^, CovarianceFunctions.EQ(), 3)
     @test typeof(k) == typeof(h)
     x = randn(3)
     g = grid(x, x, x)
