@@ -13,7 +13,7 @@ struct Lengthscale{T, K} <: StationaryKernel{T}
         new{S, typeof(k)}(k, l)
     end
 end
-(k::Lengthscale)(τ::Real) = k.k(τ/k.l)
+(k::Lengthscale)(τ::Number) = k.k(τ/k.l)
 isisotropic(k::Lengthscale) = isisotropic(k.k)
 isstationary(k::Lengthscale) = isstationary(k.k)
 
@@ -70,7 +70,7 @@ struct Periodic{T, K<:StationaryKernel{T}} <: IsotropicKernel{T}
 end
 # squared euclidean distance of x, y in the space (cos(x), sin(x))
 # since τ_new^2 = (cos(x) - cos(y))^2 + (sin(x) - sin(y))^2 = 4*sin((x-y)/2)^2 = 4sin(τ/2)^2
-(p::Periodic)(τ::Real) = p.k(2sin(π*τ)) # without scaling, this is 1-periodic
+(p::Periodic)(τ::Number) = p.k(2sin(π*τ)) # without scaling, this is 1-periodic
 parameters(p::Periodic) = parameters(p.k)
 nparameters(p::Periodic) = nparameters(p.k)
 Base.similar(p::Periodic, θ::AbstractVector) = similar(p.k, θ)
