@@ -1,5 +1,8 @@
 module CovarianceFunctions
 
+export AbstractKernel, MercerKernel, StationaryKernel, IsotropicKernel, MulitKernel
+export gramian, Gramian
+
 using LinearAlgebra
 using ForwardDiff
 using DiffResults

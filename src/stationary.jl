@@ -4,7 +4,7 @@ using LinearAlgebraExtensions: ispsd, difference
 # x, y inputs
 # τ = x-y difference
 (k::MercerKernel)(x, y) = k(difference(x, y)) # if the two argument signature is not defined, must be stationary
-(k::MercerKernel)(τ) = k(norm(τ)) # if only the scalar argument form is defined, must be isotropic
+(k::MercerKernel)(τ::AbstractVector) = k(norm(τ)) # if only the scalar argument form is defined, must be isotropic
 
 ############################# constant kernel ##################################
 # can be used to rescale existing kernels
@@ -34,7 +34,7 @@ struct ExponentiatedQuadratic{T} <: IsotropicKernel{T} end
 const EQ = ExponentiatedQuadratic
 EQ() = EQ{Float64}()
 
-(k::EQ)(τ::Real) = exp(-τ^2/2)
+(k::EQ)(τ::Number) = exp(-τ^2/2)
 
 ########################## rational quadratic kernel ###########################
 struct RationalQuadratic{T} <: IsotropicKernel{T}
@@ -44,7 +44,7 @@ end
 const RQ = RationalQuadratic
 RQ(α::Real) = RQ{typeof(α)}(α)
 
-(k::RQ)(τ::Real) = (1 + τ^2 / (2*k.α))^-k.α
+(k::RQ)(τ::Number) = (1 + τ^2 / (2*k.α))^-k.α
 parameters(k::RQ) = [k.α]
 nparameters(::RQ) = 1
 
@@ -53,7 +53,7 @@ struct Exponential{T} <: IsotropicKernel{T} end
 const Exp = Exponential
 Exp() = Exp{Float64}()
 
-(k::Exp)(τ::Real) = exp(-abs(τ))
+(k::Exp)(τ::Number) = exp(-abs(τ))
 
 ############################ γ-exponential kernel ##############################
 struct GammaExponential{T<:Real} <: IsotropicKernel{T}
@@ -63,7 +63,7 @@ end
 const γExp = GammaExponential
 γExp(γ::T) where T = γExp{T}(γ)
 
-(k::γExp)(τ::Real) = exp(-abs(τ)^(k.γ)/2)
+(k::γExp)(τ::Number) = exp(-abs(τ)^(k.γ)/2)
 parameters(k::γExp) = [k.γ]
 nparameters(::γExp) = 1
 
@@ -88,7 +88,7 @@ parameters(k::Matern) = [k.ν]
 nparameters(::Matern) = 1
 
 # IDEA: could have value type argument to dispatch p parameterization
-function (k::Matern)(τ::Real)
+function (k::Matern)(τ::Number)
     if τ ≈ 0
         one(τ)
     else
@@ -107,12 +107,12 @@ end
 MaternP(p::Int = 0) = MaternP{Float64}(p)
 MaternP(k::Matern) = MaternP(floor(Int, k.ν)) # project Matern to closest MaternP
 
-function (k::MaternP)(τ::Real)
+function (k::MaternP)(τ::Number)
     p = k.p
     val = zero(τ)
     r = sqrt(2p+1) * abs(τ)
     for i in 0:p
-        val += (factorial(p+i)/(factorial(i)*factorial(p-i))) * (2r)^(p-i)
+        @fastmath val += (factorial(p+i)/(factorial(i)*factorial(p-i))) * (2r)^(p-i)
     end
     val *= exp(-r) * (factorial(p)/factorial(2p))
 end
@@ -142,7 +142,7 @@ const SM = SpectralMixture
 # there is something else in the literature with the same name ...
 struct Cauchy{T} <: IsotropicKernel{T} end
 Cauchy() = Cauchy{Float64}()
-(k::Cauchy)(τ::Real) =  1/(π * (1+τ^2))
+(k::Cauchy)(τ::Number) =  1/(π * (1+τ^2))
 
 # for spectroscopy
 PseudoVoigt(α::T) where T<:Real = α*EQ{T}() + (1-α)*Cauchy{T}()
@@ -152,4 +152,4 @@ PseudoVoigt(α::T) where T<:Real = α*EQ{T}() + (1-α)*Cauchy{T}()
 struct InverseMultiQuadratic{T} <: IsotropicKernel{T}
     c::T
 end
-(k::InverseMultiQuadratic)(τ::Real) = 1/√(τ^2 + k.c^2)
+(k::InverseMultiQuadratic)(τ::Number) = 1/√(τ^2 + k.c^2)
