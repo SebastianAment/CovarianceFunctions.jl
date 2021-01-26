@@ -173,7 +173,7 @@ version = "0.21.1"
 
 [[KroneckerProducts]]
 deps = ["LazyInverse", "LinearAlgebra", "LinearAlgebraExtensions", "Random", "Test"]
-git-tree-sha1 = "8bb6d0d10f1a53e510e834c7372cdd9ca8851570"
+git-tree-sha1 = "a24343d956e46096a3b23dba4efc46a807cd8efb"
 repo-rev = "master"
 repo-url = "https://github.com/SebastianAment/KroneckerProducts.jl.git"
 uuid = "1b19e153-50d3-4699-8064-93bcb9fb4fba"
@@ -212,7 +212,7 @@ uuid = "37e2e46d-f89d-539d-b4ee-838fcccc9c8e"
 
 [[LinearAlgebraExtensions]]
 deps = ["FFTW", "InfiniteArrays", "LazyArrays", "LazyInverse", "LinearAlgebra", "StatsBase", "Test"]
-git-tree-sha1 = "7b483964f3cfee25f3c512bc1a1eb6e5ad63aa43"
+git-tree-sha1 = "90996903f03d04c45cc7c85253693f0983373419"
 repo-rev = "master"
 repo-url = "https://github.com/SebastianAment/LinearAlgebraExtensions.jl.git"
 uuid = "cb114d4a-f1bd-499c-ad9e-7f2ed74575b9"
@@ -388,7 +388,7 @@ uuid = "4ec0a83e-493e-50e2-b9ac-8f72acf5a8f5"
 
 [[WoodburyIdentity]]
 deps = ["BenchmarkTools", "LazyInverse", "LinearAlgebra", "LinearAlgebraExtensions", "Test"]
-git-tree-sha1 = "2ee3c4360c943c0eaa52c89e5f4d28f620465143"
+git-tree-sha1 = "4756b5f96be00e133d5575fae4244b40d780b7da"
 repo-rev = "master"
 repo-url = "git@github.com:SebastianAment/WoodburyIdentity.jl.git"
 uuid = "49563772-d9e4-48b4-a8b6-4cbe661ead9f"
