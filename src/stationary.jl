@@ -112,7 +112,7 @@ function (k::MaternP)(r::Number)
     val = zero(r)
     r *= sqrt(2p+1)
     for i in 0:p
-        @fastmath val += (factorial(p+i)/(factorial(i)*factorial(p-i))) * (2r)^(p-i)
+        val += (factorial(p+i)/(factorial(i)*factorial(p-i))) * (2r)^(p-i) # putting @fastmath here leads to NaN with ForwardDiff
     end
     val *= exp(-r) * (factorial(p)/factorial(2p))
 end

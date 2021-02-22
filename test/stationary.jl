@@ -5,10 +5,10 @@ using LinearAlgebra
 using LinearAlgebraExtensions: LowRank
 
 using CovarianceFunctions
-using CovarianceFunctions: MercerKernel, StationaryKernel, isstationary, isisotropic
-using CovarianceFunctions: Constant, EQ, RQ, Exp, γExp, Delta, Cosine, MaternP, Matern#, SM
-using CovarianceFunctions: iscov, enorm
-using CovarianceFunctions: Normed
+using CovarianceFunctions: MercerKernel, StationaryKernel, isstationary, isisotropic,
+                    Constant, EQ, RQ, Exp, γExp, Delta, Cosine, MaternP, Matern#, SM
+using CovarianceFunctions: iscov, enorm, Normed
+using ForwardDiff: derivative
 
 const k_strings = ["Exponentiated Quadratic", "Exponential", "δ",
             "Constant", "Rational Quadratic",
@@ -42,7 +42,7 @@ const tol = 1e-12
 
     @testset "MaternP" begin
         # testing different inputs
-        for p = 1:4
+        for p = 0:4
             k = MaternP(p)
             Σ .= k.(x, permutedims(x))
             @test iscov(Σ, tol)
@@ -53,9 +53,13 @@ const tol = 1e-12
 
         # can be constructed via Matern constructor with appropriate ν
         # we might not want to do that if we want to optimize ν
-        for p = 1:4
+        for p = 0:4
             @test MaternP(Matern(p+1/2)) isa MaternP
         end
+
+        # testing differentiability
+        k = MaternP(1)
+        @test derivative(k, 0) ≈ 0
     end
 
 end
