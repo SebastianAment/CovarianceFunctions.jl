@@ -41,6 +41,8 @@ struct Normed{T, K, N} <: StationaryKernel{T}
 end
 # WARNING: input function must be isotropic
 (m::Normed)(τ::AbstractVector) = m.k(m.n(τ))
+(m::Normed)(x, y) = m(difference(x, y))
+
 # WARNING: need to define parameters for norm function n (if it has any)
 parameters(k::Normed) = vcat(parameters(k.k), parameters(k.n))
 nparameters(k::Normed) = nparameters(k.k) + nparameters(k.n)

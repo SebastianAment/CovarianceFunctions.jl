@@ -17,7 +17,7 @@ end
 (k::MatrixKernel)(x::Integer, y::Integer) = k.A[i,j]
 
 ############################ Brownian kernel ###################################
-# technically stationary increments ...
+# has stationary increments
 struct Brownian{T} <: MercerKernel{T} end
 (k::Brownian)(x::Real, y::Real) = min(x, y)
 
@@ -32,15 +32,9 @@ struct FiniteBasis{T, B<:Union{AbstractVector, Tuple}} <: MercerKernel{T}
         new{T, typeof(basis)}(basis)
     end
 end
-# FiniteBasis{T}(basis) where T = FiniteBasis{T, typeof(basis)}(basis)
 FiniteBasis(basis) = FiniteBasis{Float64}(basis)
-function (k::FiniteBasis)(x, y)
-    v = zero(eltype(k))
-    for b in k.basis
-        v += b(x)*b(y)
-    end
-    return v
-end
+(k::FiniteBasis)(x, y) = sum(b->b(x)*b(y), k.basis)
+
 # TODO: have in-place versions?
 function basis(k::FiniteBasis, x::AbstractVector)
     U = zeros(eltype(k), (length(x), length(k.basis)))

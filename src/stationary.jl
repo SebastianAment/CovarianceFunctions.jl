@@ -2,9 +2,10 @@
 using LinearAlgebraExtensions: ispsd, difference
 # notation:
 # x, y inputs
-# τ = x-y difference
-(k::MercerKernel)(x, y) = k(difference(x, y)) # if the two argument signature is not defined, must be stationary
-(k::MercerKernel)(τ::AbstractVector) = k(norm(τ)) # if only the scalar argument form is defined, must be isotropic
+# τ = x-y difference of inputs
+# r = norm(x-y) norm of τ
+(k::MercerKernel)(x, y) = k(norm(difference(x, y))) # if the two argument signature is not defined, default to stationary
+(k::MercerKernel)(r) = k(norm(r)) # if only the scalar argument form is defined, must be isotropic
 
 ############################# constant kernel ##################################
 # can be used to rescale existing kernels
@@ -24,9 +25,9 @@ end
 parameters(k::Constant) = [k.c]
 nparameters(::Constant) = 1
 
-# should type of constant field and τ agree? what promotion is necessary?
+# should type of constant field and r agree? what promotion is necessary?
 # do we need the isotropic/ stationary evaluation, if we overwrite the mercer one?
-(k::Constant)(τ) = k.c # stationary / isotropic
+(k::Constant)(r) = k.c # stationary / isotropic
 (k::Constant)(x, y) = k.c # mercer
 
 #################### standard exponentiated quadratic kernel ###################
@@ -34,7 +35,7 @@ struct ExponentiatedQuadratic{T} <: IsotropicKernel{T} end
 const EQ = ExponentiatedQuadratic
 EQ() = EQ{Float64}()
 
-(k::EQ)(τ::Number) = exp(-τ^2/2)
+(k::EQ)(r::Number) = exp(-r^2/2)
 
 ########################## rational quadratic kernel ###########################
 struct RationalQuadratic{T} <: IsotropicKernel{T}
@@ -44,7 +45,7 @@ end
 const RQ = RationalQuadratic
 RQ(α::Real) = RQ{typeof(α)}(α)
 
-(k::RQ)(τ::Number) = (1 + τ^2 / (2*k.α))^-k.α
+(k::RQ)(r::Number) = (1 + r^2 / (2*k.α))^-k.α
 parameters(k::RQ) = [k.α]
 nparameters(::RQ) = 1
 
@@ -53,7 +54,7 @@ struct Exponential{T} <: IsotropicKernel{T} end
 const Exp = Exponential
 Exp() = Exp{Float64}()
 
-(k::Exp)(τ::Number) = exp(-abs(τ))
+(k::Exp)(r::Number) = exp(-r)
 
 ############################ γ-exponential kernel ##############################
 struct GammaExponential{T<:Real} <: IsotropicKernel{T}
@@ -63,7 +64,7 @@ end
 const γExp = GammaExponential
 γExp(γ::T) where T = γExp{T}(γ)
 
-(k::γExp)(τ::Number) = exp(-abs(τ)^(k.γ)/2)
+(k::γExp)(r::Number) = exp(-r^k.γ / 2)
 parameters(k::γExp) = [k.γ]
 nparameters(::γExp) = 1
 
@@ -71,13 +72,11 @@ nparameters(::γExp) = 1
 struct Delta{T} <: IsotropicKernel{T} end
 const δ = Delta
 δ() = δ{Float64}()
-# TODO: returning type T might not work well with A.D., should it?
-(k::δ{T})(τ) where {T} = T(all(x->isequal(x, 0), τ))
-(k::δ{T})(x, y) where {T} = T(all(x -> isequal(x...), zip(x, y)))
-gramian(::δ{T}, x::AbstractVector) where {T} = (one(T)*I)(length(x))
+
+(k::δ)(r) = all(iszero, r) ? one(eltype(r)) : zero(eltype(r))
 
 ############################ Matern kernel #####################################
-# TODO: use rational types to dispatch to MaternP evaluation, i.e. 5//2 -> MaternP(3)
+# IDEA: use rational types to dispatch to MaternP evaluation, i.e. 5//2 -> MaternP(3)
 # seems k/2 are representable exactly in floating point?
 struct Matern{T} <: IsotropicKernel{T}
     ν::T
@@ -88,12 +87,12 @@ parameters(k::Matern) = [k.ν]
 nparameters(::Matern) = 1
 
 # IDEA: could have value type argument to dispatch p parameterization
-function (k::Matern)(τ::Number)
-    if τ ≈ 0
-        one(τ)
+function (k::Matern)(r::Number)
+    if r ≈ 0
+        one(r)
     else
         ν = k.ν
-        r = sqrt(2ν) * abs(τ)
+        r *= sqrt(2ν)
         2^(1-ν) / gamma(ν) * r^ν * besselk(ν, r)
     end
 end
@@ -107,10 +106,11 @@ end
 MaternP(p::Int = 0) = MaternP{Float64}(p)
 MaternP(k::Matern) = MaternP(floor(Int, k.ν)) # project Matern to closest MaternP
 
-function (k::MaternP)(τ::Number)
+# IDEA: could pre-calculate factorials up to order 2p
+function (k::MaternP)(r::Number)
     p = k.p
-    val = zero(τ)
-    r = sqrt(2p+1) * abs(τ)
+    val = zero(r)
+    r *= sqrt(2p+1)
     for i in 0:p
         @fastmath val += (factorial(p+i)/(factorial(i)*factorial(p-i))) * (2r)^(p-i)
     end
@@ -126,8 +126,8 @@ struct CosineKernel{T, V<:Union{T, AbstractVector{T}}} <: StationaryKernel{T}
 end
 const Cosine = CosineKernel
 # IDEA: trig-identity -> low-rank gramian
-(k::CosineKernel)(τ) = cos(2π * dot(k.μ, τ))
-(k::CosineKernel{<:Real, <:Real})(τ) = cos(2π * k.μ * sum(τ))
+(k::CosineKernel)(r) = cos(2π * dot(k.μ, r))
+(k::CosineKernel{<:Real, <:Real})(r) = cos(2π * k.μ * sum(r))
 
 parameters(k::CosineKernel) = k.μ isa Real ? [k.μ] : k.μ
 nparameters(k::CosineKernel) = length(k.μ)
@@ -142,7 +142,7 @@ const SM = SpectralMixture
 # there is something else in the literature with the same name ...
 struct Cauchy{T} <: IsotropicKernel{T} end
 Cauchy() = Cauchy{Float64}()
-(k::Cauchy)(τ::Number) =  1/(π * (1+τ^2))
+(k::Cauchy)(r::Number) =  1/(π * (1+r^2))
 
 # for spectroscopy
 PseudoVoigt(α::T) where T<:Real = α*EQ{T}() + (1-α)*Cauchy{T}()
@@ -152,4 +152,4 @@ PseudoVoigt(α::T) where T<:Real = α*EQ{T}() + (1-α)*Cauchy{T}()
 struct InverseMultiQuadratic{T} <: IsotropicKernel{T}
     c::T
 end
-(k::InverseMultiQuadratic)(τ::Number) = 1/√(τ^2 + k.c^2)
+(k::InverseMultiQuadratic)(r::Number) = 1/√(r^2 + k.c^2)

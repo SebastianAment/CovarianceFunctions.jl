@@ -20,8 +20,16 @@ end
     basis = [sin, cos, identity]
     k = FiniteBasis(basis)
     @test k isa FiniteBasis
-    @test gramian(k, randn(16)) isa LowRank
-    @test gramian(k, randn(2)) isa Gramian # if # of functions is larger than data
+    x = randn(16)
+    @test gramian(k, x) isa LowRank
+    U = [sin.(x) cos.(x) x]
+    @test Matrix(gramian(k, x)) ≈ U*U'
+
+    x = randn(2)
+    @test gramian(k, x) isa Gramian # if # of functions is larger than data
+    U = [sin.(x) cos.(x) x]
+    @test Matrix(gramian(k, x)) ≈ U*U'
+    
     # FiniteBasis([]) # throws
 end
 
