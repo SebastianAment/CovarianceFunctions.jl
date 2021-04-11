@@ -1,15 +1,20 @@
 ################################################################################
+LinearAlgebra.diagzero(D::Diagonal{<:Diagonal{T}}, i, j) where T = zeros(T, (size(D.diag[i], 1), size(D.diag[j], 2)))
+
 # if we have Matrix valued kernels, this should be different
 Base.eltype(k::AbstractKernel{T}) where {T} = T
 Base.eltype(::MultiKernel{T}) where {T} = Matrix{T}
 
-# fieldtype of vector space
-fieldtype(k::AbstractKernel) = eltype(k)
-fieldtype(x) = eltype(x) # base
-fieldtype(x::Union{Tuple, AbstractArray}) = fieldtype(eltype(x))
-# # Base.eltype(T; recursive::Val{true}) = T == eltype(T) ? T : eltype(T, recursive = Val(true))
+const VecOfVec{T} = AbstractVector{<:AbstractVector{T}}
+const VecOrVecOfVec{T} = AbstractVector{<:AbstractVector{T}}
 
 ################################################################################
+# euclidean distance
+_d2(x::Real, y::Real) = (x-y)^2
+_d2(x::Tuple) = _d2(x...)
+euclidean2(x, y) = sum(_d2, zip(x, y))
+euclidean(x, y) = sqrt(_euclidean2(x, y))
+
 # energetic norm
 enorm(A::AbstractMatOrFac, x::AbstractVector) = sqrt(dot(x, A, x))
 
@@ -26,28 +31,6 @@ function checklength(x::AbstractArray, y::AbstractArray)
     ly = length(y)
     if lx != ly; throw(DimensionMismatch("length(x) ($lx) ≠ length(y) ($ly)")) end
     return length(x)
-end
-
-################################################################################
-# matrix of matrices to matrix, useful for testing Gramians of multi-output kernels
-function matmat2mat(A::AbstractMatrix{<:AbstractMatrix})
-    n, m = size(A)
-    all(==(size(A[1])), (size(Ai) for Ai in A)) || throw(DimensionMismatch("component matrices do not have the same size"))
-    ni, mi = size(A[1])
-    B = zeros(n*ni, m*mi)
-    for j in 1:m
-        jnd = (j-1)*mi+1 : j*mi
-        for i in 1:n
-            ind = (i-1)*ni+1 : i*ni
-            Bij = @view B[ind, jnd]
-            Aij = A[i, j]
-            if Aij isa Factorization
-                Aij = Matrix(Aij)
-            end
-            copyto!(Bij, Aij)
-        end
-    end
-    return B
 end
 
 ####################### randomized stationarity tests ##########################
@@ -99,4 +82,79 @@ function isstationary(k::AbstractKernel, x::AbstractVector)
         println("Covariance function " * string(K) * " seems to be stationary. Consider defining isstationary(k::$K) = true.")
     end
     return is_stationary
+end
+
+
+################################################################################
+# in contrast to the AppliedMatrix in LazyArrays, this is not completely lazy
+#in that it calculates intermediate results
+struct LazyMatrixProduct{T, AT<:Tuple{Vararg{AbstractMatOrFac}}} <: Factorization{T}
+    args::AT
+end
+LazyMatrixProduct{T}(args) where T = LazyMatrixProduct{T, typeof(args)}(args)
+LazyMatrixProduct(args) = LazyMatrixProduct{Float64}(args)
+
+function Base.size(L::LazyMatrixProduct, i::Int)
+    if i == 1
+        size(L.args[1], 1)
+    elseif i == 2
+        size(L.args[end], 2)
+    else
+        1
+    end
+end
+issquare(A::AbstractMatOrFac) = size(A, 1) == size(A, 2)
+# allsquare(L::LazyMatrixProduct) = all(issquare, L.args)
+Base.Matrix(L::LazyMatrixProduct) = prod(L.args)
+Base.AbstractMatrix(L::LazyMatrixProduct) = Matrix(L)
+
+Base.:*(L::LazyMatrixProduct, x::AbstractVector) = mul!(similar(x, size(L, 1)), L, x)
+function LinearAlgebra.mul!(y::AbstractVector, L::LazyMatrixProduct, x::AbstractVector, α::Real = 1, β::Real = 0)
+    z = deepcopy(x)
+    for A in L.args
+        z = A*z
+    end
+    @. y = α*z + β*y
+    return y
+end
+
+
+# function LinearAlgebra.mul!(y::AbstractVector, L::LazyMatrixProduct, x::AbstractVector, α::Real = 1, β::Real = 0)
+#     if all(issquare, L.args)
+#         z1, z2 = similar(x), similar(x)
+#
+#         # if odd and greater than 1, we need to start with z
+#         iseven(length(L.args)) ? copyto!(y, x) : copyto!(z, x)
+#         for A in L.args
+#             mul!(z, A, y)
+#             y, z = z, y
+#         end
+#
+#     else
+#         z = copy(x)
+#         for A in L.args
+#             z = A*z
+#         end
+#         copyto!(y, z)
+#     end
+#     return y
+# end
+
+######################### perfect shuffle matrices #############################
+function perfect_shuffle(n::Int)
+    S = spzeros(n^2, n^2)
+    for i in 1:n, j in 1:n
+        S[j+n*(i-1), i+n*(j-1)] = 1
+    end
+    return S
+end
+
+# X is n by m
+# S will perform S*vec(X) = vec(X')
+function perfect_shuffle(n::Int, m::Int)
+    S = spzeros(n*m, n*m)
+    for i in 1:n, j in 1:m
+        S[j+m*(i-1), i+n*(j-1)] = 1
+    end
+    return S
 end

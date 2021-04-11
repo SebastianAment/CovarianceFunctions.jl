@@ -1,4 +1,5 @@
 ########################## non-stationary kernels ##############################
+# abstract type DotProductKernel{T} <: MercerKernel{T} end
 ########################### dot product kernel #################################
 struct Dot{T} <: MercerKernel{T} end
 Dot() = Dot{Float64}()
@@ -63,7 +64,7 @@ end
 const NN = NeuralNetwork
 
 # NN{T}(σ::T = one(T)) where {T} = NN(σ)
-NN() = NN{Float64}(1.)
+NN() = NN{Float64}(0.)
 
 function (k::NN)(x, y)
     l = Line(k.σ)

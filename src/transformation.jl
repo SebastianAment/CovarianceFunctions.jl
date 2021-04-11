@@ -31,8 +31,8 @@ end
 struct Normed{T, K, N} <: StationaryKernel{T}
     k::K
     n::N # norm for r call
-    function Normed(k::AbstractKernel, n)
-        new{fieldtype(k), typeof(k), typeof(n)}(k, n)
+    function Normed(k::AbstractKernel{T}, n) where T
+        new{T, typeof(k), typeof(n)}(k, n)
     end
     function Normed(k, n)
         T = typeof(k(n(0.)))
@@ -76,3 +76,28 @@ end
 parameters(p::Periodic) = parameters(p.k)
 nparameters(p::Periodic) = nparameters(p.k)
 Base.similar(p::Periodic, θ::AbstractVector) = similar(p.k, θ)
+
+######################## general linear input scaling ##########################
+struct ScaledInputKernel{T, K, UT} <: AbstractKernel{T}
+    k::K
+    U::UT
+end
+ScaledInputKernel(k, U) = ScaledInputKernel{Float64}(k, U)
+ScaledInputKernel{T}(k, U) where T = ScaledInputKernel{T, typeof(k), typeof(U)}(k, U)
+(S::ScaledInputKernel)(x, y) = S.k(S.U*x, S.U*y)
+
+# if U has quadratic complexity in d, this reduces from O(n^2d^2) to O(nd^2 + n^2d)
+# currently, this acceleration is currently only used if S.U is square and not diagonal
+function gramian(S::ScaledInputKernel, x::AbstractVector, y::AbstractVector)
+    if size(S.U, 1) < size(S.U, 2)
+        Gramian(S, x, y)
+    else
+        x = (S.U,) .* x
+        y = x ≡ y ? x : (S.U,) .* y
+        gramian(S.k, x, y)
+    end
+end
+# if the scaling can be carried out efficiently, like for Diagonal, no need
+function gramian(S::ScaledInputKernel{<:Real, <:Any, <:Diagonal},  x::AbstractVector, y::AbstractVector)
+    Gramian(S, x, y)
+end

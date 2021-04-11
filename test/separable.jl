@@ -1,7 +1,7 @@
 module TestSeparable
 using Test
 using CovarianceFunctions
-using CovarianceFunctions: Separable, matmat2mat
+using CovarianceFunctions: Separable
 using LinearAlgebra
 using KroneckerProducts
 k = CovarianceFunctions.EQ()
@@ -17,10 +17,10 @@ k = CovarianceFunctions.EQ()
     n = 3
     x = randn(n)
     K = CovarianceFunctions.gramian(G, x)
-    @test issymmetric(K)
-    @test isposdef(K)
-    @test size(K) == (n, n)
-    MK = matmat2mat(K)
+    @test size(K) == (d*n, d*n)
+    MK = Matrix(K)
+    @test issymmetric(MK)
+    @test isposdef(MK)
     @test size(MK) == (d*n, d*n)
 
     KK = kronecker(K)

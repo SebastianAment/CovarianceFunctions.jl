@@ -29,10 +29,6 @@ end
 # also, need special multiplication
 function LinearAlgebra.mul!(y::AbstractVecOfVec, G::Gramian{<:AbstractMatrix, <:Separable},
                             x::AbstractVecOfVec)
-    K = G.k.B ⊗ gramian(G.k.k, x, y) # convert to kronecker
+    K = gramian(G.k.k, G.x, G.y) ⊗ G.k.B # convert to kronecker # order?
     return mul!(y, kronecker(G), x)
 end
-
-# ISSUE: kronecker product returns a matrix of scalars, whereas
-# gramian of gradient kernel returns matrix of matrices ...
-# implement "block" version of kronecker?

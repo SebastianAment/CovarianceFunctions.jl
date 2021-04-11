@@ -46,6 +46,7 @@ const RQ = RationalQuadratic
 RQ(α::Real) = RQ{typeof(α)}(α)
 
 (k::RQ)(r::Number) = (1 + r^2 / (2*k.α))^-k.α
+
 parameters(k::RQ) = [k.α]
 nparameters(::RQ) = 1
 
@@ -106,7 +107,6 @@ end
 MaternP(p::Int = 0) = MaternP{Float64}(p)
 MaternP(k::Matern) = MaternP(floor(Int, k.ν)) # project Matern to closest MaternP
 
-# IDEA: could pre-calculate factorials up to order 2p
 function (k::MaternP)(r::Number)
     p = k.p
     val = zero(r)

@@ -5,7 +5,7 @@ using Test
 # TODO: test on real data
 # dataset:
 # https://cdiac.ess-dive.lbl.gov/ftp/trends/co2/maunaloa.co2
-@testset "spectral mixture CovarianceFunctions" begin
+@testset "spectral mixture kernel" begin
     n = 32
     x = sort!(randn(n))
     w = 1.
