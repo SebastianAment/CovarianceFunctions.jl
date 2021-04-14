@@ -153,6 +153,8 @@ end
 
 ################################################################################
 # [f, ∂f] ∼ GP([μ, ∂μ], dK) # value + gradient kernel
+# IDEA: For efficiency, maybe create ValueGradientKernelElement like in hessian.jl
+# currently, this is an order of magnitude slower than GradientKernel
 struct ValueGradientKernel{T, K} <: MultiKernel{T}
     k::K
 end

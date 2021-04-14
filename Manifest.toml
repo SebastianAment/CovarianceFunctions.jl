@@ -17,9 +17,9 @@ uuid = "0dad84c5-d112-42e6-8d28-ef12dabb789f"
 
 [[ArrayLayouts]]
 deps = ["FillArrays", "LinearAlgebra", "SparseArrays"]
-git-tree-sha1 = "9aa9647b58147a81f7359eacc7d6249ac3a3e3d4"
+git-tree-sha1 = "d68733034d1d5d2cd3ea68e2b4cb11f456f6d015"
 uuid = "4c555306-a7a7-4459-81d9-ec55ddd5c99a"
-version = "0.6.4"
+version = "0.6.5"
 
 [[Artifacts]]
 uuid = "56f22d72-fd6d-98f1-02f0-08ddc0907c33"
@@ -262,10 +262,10 @@ uuid = "7d188eb4-7ad8-530c-ae41-71a32a6d4692"
 version = "0.3.3"
 
 [[JuMP]]
-deps = ["Calculus", "DataStructures", "ForwardDiff", "JSON", "LinearAlgebra", "MathOptInterface", "MutableArithmetics", "NaNMath", "Random", "SparseArrays", "SpecialFunctions", "Statistics"]
-git-tree-sha1 = "e952f49e2242fa21edcf27bbd6c67041685bee5d"
+deps = ["Calculus", "DataStructures", "ForwardDiff", "JSON", "LinearAlgebra", "MathOptInterface", "MutableArithmetics", "NaNMath", "Printf", "Random", "SparseArrays", "SpecialFunctions", "Statistics"]
+git-tree-sha1 = "e6eaa873100e72fbe185516a889ffeb8d0adeea3"
 uuid = "4076af6c-e467-56ae-b986-b466b2749572"
-version = "0.21.6"
+version = "0.21.7"
 
 [[KroneckerProducts]]
 deps = ["LazyInverse", "LinearAlgebra", "LinearAlgebraExtensions", "Random", "Test"]
@@ -397,9 +397,9 @@ uuid = "14a3606d-f60d-562e-9121-12d972cd8159"
 
 [[MutableArithmetics]]
 deps = ["LinearAlgebra", "SparseArrays", "Test"]
-git-tree-sha1 = "ff3aa3e4dbc837f80c2031de2f90125c8b3793f3"
+git-tree-sha1 = "9d8a9d164144aa1e2dee465a9526091750187a17"
 uuid = "d8a4904e-b15c-11e9-3269-09a3773c0cb0"
-version = "0.2.15"
+version = "0.2.16"
 
 [[NaNMath]]
 git-tree-sha1 = "bfe47e760d60b82b66b61d2d44128b62e3a369fb"
@@ -501,16 +501,16 @@ uuid = "c946c3f1-0d1f-5ce8-9dea-7daa1f7e2d13"
 version = "0.7.1"
 
 [[SCS_GPU_jll]]
-deps = ["Libdl", "OpenBLAS_jll", "Pkg"]
-git-tree-sha1 = "44badbd675d79303fd5b0a7a5380ed7624bd989a"
+deps = ["Artifacts", "JLLWrappers", "Libdl", "OpenBLAS_jll", "Pkg"]
+git-tree-sha1 = "9c0b47a387c4c7d8a66abb11977391a6602d2384"
 uuid = "af6e375f-46ec-5fa0-b791-491b0dfa44a4"
-version = "2.1.2+0"
+version = "2.1.3+0"
 
 [[SCS_jll]]
 deps = ["Artifacts", "JLLWrappers", "Libdl", "OpenBLAS_jll", "Pkg"]
-git-tree-sha1 = "6cdaccb5e6a69455f960de1ae445ba1de5db9d0d"
+git-tree-sha1 = "4816f8272a3e9d08a32a4e94b367c7e84057c145"
 uuid = "f4f2fc5b-1d94-523c-97ea-2ab488bedf4b"
-version = "2.1.2+1"
+version = "2.1.3+0"
 
 [[SHA]]
 uuid = "ea8e919c-243c-51af-8825-aaa63cd721ce"
@@ -567,9 +567,9 @@ uuid = "a4e569a6-e804-4fa4-b0f3-eef7a1d5b13e"
 
 [[TaylorSeries]]
 deps = ["InteractiveUtils", "LinearAlgebra", "Markdown", "Requires", "SparseArrays"]
-git-tree-sha1 = "689b31ce044e419621706c6a876f8d07c7b5318c"
+git-tree-sha1 = "66f4d1993bae49eeba21a1634b5f65782585a42c"
 uuid = "6aa5eb33-94cf-58f4-a9d0-e4b2c4fc25ea"
-version = "0.10.12"
+version = "0.10.13"
 
 [[Test]]
 deps = ["InteractiveUtils", "Logging", "Random", "Serialization"]

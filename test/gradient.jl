@@ -10,7 +10,7 @@ const AbstractMatOrFac = Union{AbstractMatrix, Factorization}
 
 @testset "gradient kernels" begin
     # nd test
-    n = 8
+    n = 32
     d = 16
     X = randn(d, n)
     ε = 1e4eps()
@@ -70,7 +70,11 @@ const AbstractMatOrFac = Union{AbstractMatrix, Factorization}
             MK = Matrix(K)
             @test maximum(abs, MK - MK') < ε
             MK = Symmetric(MK)
-            @test all(≥(-1e-12), eigvals(MK)) # positive semidefinite
+            if !all(≥(-1e-10), eigvals(MK))
+                println("eigensnafoo")
+                display(eigvals(MK))
+            end
+            @test all(≥(-1e-10), eigvals(MK)) # positive semidefinite
             @test size(MK) == ((d+1)*n, (d+1)*n)
 
             # create anonymous wrapper around kernel to trigger generic fallback
@@ -83,12 +87,22 @@ const AbstractMatOrFac = Union{AbstractMatrix, Factorization}
             @test MK ≈ MK2 # compare generic and specialized evaluation of gradient kernel
 
             # testing matrix multiply
-            # println("mul")
             Kab = deepcopy(b)
             α, β = randn(2) # trying out two-argument mul
             mul!(Kab, K, a, α, β) # saves some memory, Woodbury still allocates a lot
             MKab = @. α * $*(MK, a) + β * b
             @test Kab ≈ MKab
+        end
+
+        # testing matrix solve
+        # println("div")
+        for k in [EQ(), RQ(1.)] # TODO: better conditioned NN kernel with bias
+            G = ValueGradientKernel(k)
+            K = CovarianceFunctions.gramian(G, X)
+            a = randn(n*(d+1))
+            Ka = K*a
+            as = K\Ka
+            @test norm(K*as-Ka) < 1e-6
         end
     end
     # matrix multiply

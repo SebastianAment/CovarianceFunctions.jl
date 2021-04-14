@@ -1,4 +1,4 @@
-# TODO: GradientLaplacianKernel?
+# IDEA: GradientLaplacianKernel?
 struct HessianKernel{T, K} <: MultiKernel{T}
     k::K
     # input_type::IT  IT<:InputTrait
@@ -366,15 +366,16 @@ function LinearAlgebra.mul!(b::AbstractVector, K::ValueGradientHessianKernelElem
     # gradient
     @. b[gi] += α * k1 * r * a[vi]
     @. b[gi] -= α * (k1 * agi + k2 * r * ra)
-    @. b[gi] -= α * (k1 * ida + k2 * rra) * r # this sign seems correct
+    @. b[gi] += α * (k2 * ida + k3 * rra) * r # this sign seems correct
+
     BA = zeros(d)
     Ahi = reshape(ahi, d, d)
     BA += Ahi * r + vec(r' * Ahi) # can be combined with the below
     @. b[gi] += α * k2 * BA
 
     # hessian
-    @. b[hi] += α * (k1 * vId + k2 * rr) * (a[vi] + ra) # value part of gradient
-    # @. b[hi] += α * (k1 * vId + k2 * rr) * ra # this can be collected with the above
+    @. b[hi] += α * (k1 * vId + k2 * rr) * a[vi] # value part of gradient
+    @. b[hi] -= α * (k2 * vId + k3 * rr) * ra # this can be collected with the above
     BA = zeros(d, d)
     @. BA += agi * r' + r * agi' # can be combined with the below
     @. b[hi] -= α * k2 * $vec(BA)
