@@ -4,6 +4,7 @@ stationary
 properties
 gramian
 sm
+block
 gradient
 hessian
 separable

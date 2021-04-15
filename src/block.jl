@@ -12,12 +12,15 @@ const default_tol = 1e-8
 function BlockFactorization(A::AbstractMatrix, nind, mind; tol::Real = default_tol)
     BlockFactorization(A, nind, mind, tol)
 end
-function BlockFactorization(A::AbstractMatrix, d::Int; tol = default_tol)
-    BlockFactorization(A, 1:d:d*size(A, 1)+1, 1:d:d*size(A, 2)+1; tol = tol)
+function BlockFactorization(A::AbstractMatrix, di::Int, dj::Int = di; tol = default_tol)
+    BlockFactorization(A, 1:di:di*size(A, 1)+1, 1:dj:dj*size(A, 2)+1; tol = tol)
 end
+# WARNING: this syntax assumes A has strided block indices
 function BlockFactorization(A::AbstractMatrix; tol = default_tol)
-    BlockFactorization(A, checksquare(A[1]), tol = tol) # this assumes it is strided
+    di, dj = size(A[1, 1])
+    BlockFactorization(A, di, dj, tol = tol) # this assumes it is strided
 end
+
 Base.size(B::BlockFactorization, i::Int) = (1 ≤ i ≤ 2) ? size(B)[i] : 1
 Base.size(B::BlockFactorization) = B.nindices[end]-1, B.mindices[end]-1
 function Base.Matrix(B::BlockFactorization)
@@ -32,14 +35,22 @@ function Base.Matrix(B::BlockFactorization)
     end
     return C
 end
-# TODO: test this
-function Base.getindex(B::StridedBlockFactorization, i::Int, j::Int)
-    ni, nj = mod1(i, B.nindices.step), mod1(j, B.mindices.step)
-    ri, rj = rem(i, B.nindices.step)+1, rem(j, B.mindices.step)+1
+
+# fallback for now
+# Base.getindex(B::BlockFactorization, i::Int, j::Int) = Matrix(B)[i, j]
+function Base.getindex(B::BlockFactorization, i::Int, j::Int)
+    ni = findlast(≤(i), B.nindices)
+    ni = isnothing(ni) ? 1 : ni
+    nj = findlast(≤(j), B.mindices)
+    nj = isnothing(nj) ? 1 : nj
+    ri = i - B.nindices[ni] + 1
+    rj = j - B.mindices[nj] + 1
     return B.A[ni, nj][ri, rj]
 end
 
+# IDEA: more efficient if neccesary
 # function Base.getindex(B::StridedBlockFactorization, i::Int, j::Int)
+#     println("strided")
 #     ni, nj = mod1(i, B.nindices.step), mod1(j, B.mindices.step)
 #     ri, rj = rem(i, B.nindices.step)+1, rem(j, B.mindices.step)+1
 #     return B.A[ni, nj][ri, rj]
