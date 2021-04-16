@@ -21,6 +21,8 @@ using KroneckerProducts
 using WoodburyIdentity
 
 const AbstractVecOfVec{T} = AbstractVector{<:AbstractVector{T}}
+const AbstractVecOfVecOrMat{T} = AbstractVector{<:AbstractVecOrMat{T}}
+
 
 abstract type AbstractKernel{T} end
 abstract type MercerKernel{T} <: AbstractKernel{T} end
@@ -29,8 +31,8 @@ abstract type IsotropicKernel{T} <: StationaryKernel{T} end # ίσος + τρό�
 
 # class of matrix-valued kernels for multi-output GPs
 abstract type MultiKernel{T} <: AbstractKernel{T} end # MultiKernel
-# compute the (i, j) entry of k(x, y)
-Base.getindex(K::MultiKernel, i::Integer, j::Integer) = (x, y) -> K(x, y)[i, j]
+# compute the (i, j)th entry of k(x, y)
+Base.getindex(K::MultiKernel, i, j) = (x, y) -> getindex(K(x, y), i, j)
 
 # first, utility functions
 include("util.jl")

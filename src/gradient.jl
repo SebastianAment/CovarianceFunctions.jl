@@ -7,9 +7,13 @@ struct GradientKernel{T, K} <: MultiKernel{T}
     # input_type::IT  IT<:InputTrait
     # could add temporary storage for gradient calculation here
 end
-input_trait(G::GradientKernel) = input_trait(G.k)
 GradientKernel(k::AbstractKernel{T}) where {T} = GradientKernel{T, typeof(k)}(k)
 GradientKernel(k) = GradientKernel{Float64, typeof(k)}(k) # use fieldtype here?
+# IDEA: specialize covariance of subset of variables
+# function Base.getindex(K::GradientKernel, i::Int, j::Int) (::Colon)
+#
+# end
+input_trait(G::GradientKernel) = input_trait(G.k)
 
 function elsize(G::Gramian{<:AbstractMatrix, <:GradientKernel}, i::Int)
     i ≤ 2 ? length(G.x[1]) : 1

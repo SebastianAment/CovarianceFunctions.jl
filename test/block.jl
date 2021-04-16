@@ -19,6 +19,14 @@ using Test
             @test M[di*(ni-1)+i, dj*(mi-1)+j] == A[ni, mi][i, j]
         end
     end
+
+    # matrix multiply
+    x = randn(size(M, 2))
+    @test M*x ≈ F*x
+    k = 3
+    X = randn(size(M, 2), k)
+    @test M*X ≈ F*X
+
     # general
     n, m = 4, 5
     nindices = [1, 2, n+1]
@@ -34,6 +42,13 @@ using Test
     for i in 1:4, j in 1:5
         @test F[i, j] == M[i, j]
     end
+
+    # matrix multiply
+    x = randn(size(M, 2))
+    @test M*x ≈ F*x
+    k = 3
+    X = randn(size(M, 2), k)
+    @test M*X ≈ F*X
 end
 
 end

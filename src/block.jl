@@ -61,8 +61,12 @@ function Base.:*(B::BlockFactorization, x::AbstractVector)
     y = zeros(eltype(x), size(B, 1))
     mul!(y, B, x)
 end
-Base.:*(B::BlockFactorization, X::AbstractMatrix) = mul!(zeros(eltype(x), size(B, 1), size(X, 2)), B, X)
+function Base.:*(B::BlockFactorization, X::AbstractMatrix)
+    Y = zeros(eltype(X), size(B, 1), size(X, 2))
+    mul!(Y, B, X)
+end
 
+# TODO: MMM variant
 function LinearAlgebra.mul!(y::AbstractVector, B::BlockFactorization, x::AbstractVector, α::Real = 1, β::Real = 0)
     xx = [@view x[B.mindices[i] : B.mindices[i+1]-1] for i in 1:length(B.mindices)-1]
     yy = [@view y[B.nindices[i] : B.nindices[i+1]-1] for i in 1:length(B.nindices)-1]
@@ -70,9 +74,16 @@ function LinearAlgebra.mul!(y::AbstractVector, B::BlockFactorization, x::Abstrac
     return y
 end
 
+function LinearAlgebra.mul!(Y::AbstractMatrix, B::BlockFactorization, X::AbstractMatrix, α::Real = 1, β::Real = 0)
+    XX = [@view X[B.mindices[i] : B.mindices[i+1]-1, :] for i in 1:length(B.mindices)-1]
+    YY = [@view Y[B.nindices[i] : B.nindices[i+1]-1, :] for i in 1:length(B.nindices)-1]
+    blockmul!(YY, B.A, XX, α, β)
+    return Y
+end
+
 # carries out multiplication for general BlockFactorization
-function blockmul!(y::AbstractVecOfVec, G::AbstractMatrix{<:AbstractMatOrFac}, x::AbstractVecOfVec,
-        α::Real = 1, β::Real = 0, strided::Val{false} = Val(false))
+function blockmul!(y::AbstractVecOfVecOrMat, G::AbstractMatrix{<:AbstractMatOrFac},
+                   x::AbstractVecOfVecOrMat, α::Real = 1, β::Real = 0, strided::Val{false} = Val(false))
     for i in eachindex(y) # @threads
         @. y[i] = β * y[i]
         for j in eachindex(x)
@@ -93,15 +104,29 @@ function LinearAlgebra.mul!(y::AbstractVector, B::StridedBlockFactorization, x::
     return y
 end
 
+function LinearAlgebra.mul!(Y::AbstractMatrix, B::StridedBlockFactorization, X::AbstractMatrix, α::Real = 1, β::Real = 0)
+    size(X, 1) == size(B, 2) || throw(DimensionMismatch("size(X, 1) = $(size(X, 1)) ≠ $(size(B, 2)) = size(B, 2)"))
+    size(Y, 1) == size(B, 1) || throw(DimensionMismatch("size(Y, 1) = $(size(Y, 1)) ≠ $(size(B, 1)) = size(B, 1)"))
+    k = size(Y, 2)
+    size(Y, 2) == size(X, 2) || throw(DimensionMismatch("size(Y, 2) = $(size(Y, 2)) ≠ $(size(X, 1)) = size(X, 1)"))
+    XR, YR = reshape(X, B.mindices.step, :, k), reshape(Y, B.nindices.step, :, k)
+    n, m = size(XR, 2), size(YR, 2)
+    XX, YY = @views [XR[:, i, :] for i in 1:n], [YR[:, i, :] for i in 1:m]
+    strided = Val(true)
+    blockmul!(YY, B.A, XX, strided, α, β)
+    return Y
+end
+
 # recursively calls mul!, thereby avoiding memory allocation of block-matrix multiplication
-function blockmul!(y::AbstractVecOfVec, G::AbstractMatrix{<:AbstractMatOrFac}, x::AbstractVecOfVec,
-                  strided::Val{true}, α::Real = 1, β::Real = 0)
-    Gijs = [G[1, 1] for _ in 1:nthreads()] # pre-allocate temporary storage for matrix elements
+function blockmul!(y::AbstractVecOfVecOrMat, G::AbstractMatrix{<:AbstractMatOrFac},
+                   x::AbstractVecOfVecOrMat, strided::Val{true}, α::Real = 1, β::Real = 0)
+    Gij = G[1, 1] # this needs to be done better
+    Gijs = [Gij for _ in 1:nthreads()] # pre-allocate temporary storage for matrix elements
     for i in eachindex(y)
         @. y[i] = β * y[i]
         Gij = Gijs[threadid()]
         for j in eachindex(x)
-            evaluate!(Gij, G, i, j) # evaluating G[i, j] but can be more efficient if block has special structure (e.g. Woodbury)
+            Gij = evaluate!(Gij, G, i, j) # evaluating G[i, j] but can be more efficient if block has special structure (e.g. Woodbury)
             mul!(y[i], Gij, x[j], α, 1) # woodbury still allocates here because of Diagonal
         end
     end
@@ -109,19 +134,21 @@ function blockmul!(y::AbstractVecOfVec, G::AbstractMatrix{<:AbstractMatOrFac}, x
 end
 
 # fallback for generic matrices or factorizations
+# does not overwrite Gij in this case, only for more advanced data structures,
+# that are not already fully allocated
 function evaluate!(Gij::AbstractMatrix, G::AbstractMatrix{<:AbstractMatOrFac}, i::Int, j::Int)
-    Gij .= AbstractMatrix(G[i, j])
+    G[i, j]
 end
 
-# function LinearAlgebra.mul!(Y::AbstractMatrix, B::StridedBlockFactorization, X::AbstractMatrix, α::Real = 1, β::Real = 0)
-#     k = size(Y, 2)
-#     XR, YR = reshape(X, B.mindices.step, :, k), reshape(Y, B.nindices.step, :, k)
-#     n, m = size(XR, 2), size(YR, 2)
-#     XX, YY = @views [XR[:, i, :] for i in 1:n], [YR[:, i, :] for i in 1:m]
-#     mul!(XX, B.A, YY, α, β)
-#     return Y
+function LinearAlgebra.factorize(B::BlockFactorization; tol::Real = 0)
+    return B
+end
+# IDEA: add pre-conditioner at this step for GradientKernel, etc ...
+# maxrank could force it to stop early
+# function LinearAlgebra.factorize(B::BlockFactorization{}; tol::Real = 0, maxrank::Int = 1024)
+#     # cholesky(B, Val(true))
+#     return B
 # end
-
 using OptimizationAlgorithms: cg
 # linear solves with block factorization via cg
 Base.:\(A::BlockFactorization, b::AbstractVector) = cg(A, b; min_res = A.tol)
