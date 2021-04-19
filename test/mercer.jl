@@ -5,12 +5,16 @@ using CovarianceFunctions: iscov
 using LinearAlgebra
 
 @testset "promotion" begin
-    using CovarianceFunctions: Dot, Poly, NN
+    using CovarianceFunctions: Dot, Poly, NN, ExponentialDot
     k_arr = [Dot(), Poly(3), NN()]
     k_strings = ["Dot", "Poly", "NN"]
     for (k, str) in zip(k_arr, k_strings)
         @test k(1, 2.) ≈ k(1., 2.)
     end
+    d = 3
+    x, y = randn(d), randn(d)
+    @test (Dot()^3)(x, y) ≈ Poly(3)(x, y)
+    @test ExponentialDot()(x, y) ≈ exp(dot(x, y))
 end
 
 @testset "mercer" begin
@@ -29,7 +33,7 @@ end
     @test gramian(k, x) isa Gramian # if # of functions is larger than data
     U = [sin.(x) cos.(x) x]
     @test Matrix(gramian(k, x)) ≈ U*U'
-    
+
     # FiniteBasis([]) # throws
 end
 

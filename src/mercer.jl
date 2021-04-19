@@ -10,6 +10,12 @@ Line(σ::Real = 0.) = Dot() + σ
 Polynomial(d::Int, σ::Real = 0.) = Line(σ)^d
 const Poly = Polynomial
 
+# exponential inner product kernel
+# can be interpreted as infinite weighted combination of polynomial kernels
+struct ExponentialDot{T} <: MercerKernel{T} end
+ExponentialDot() = ExponentialDot{Float64}()
+(k::ExponentialDot)(x, y) = exp(dot(x, y))
+
 ############################# Matrix kernel ####################################
 # this could be discrete input kernel, as opposed to a matrix valued kernel
 struct MatrixKernel{T, AT<:AbstractMatrix{T}} <: MercerKernel{T}

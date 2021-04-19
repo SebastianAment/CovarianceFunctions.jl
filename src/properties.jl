@@ -11,7 +11,7 @@ isisotropic(::StationaryKernel) = false
 isisotropic(::IsotropicKernel) = true
 
 isdot(::T) where T = false # dot product kernel
-isdot(::Dot) = true
+isdot(::Union{Dot, ExponentialDot}) = true
 
 # TODO: check if this is doing constant propagation
 const ProductsAndSums{T, AT} = Union{Sum{T, AT}, Product{T, AT},
@@ -37,7 +37,7 @@ struct DotProductInput <: InputTrait end
 input_trait(::T) where T = GenericInput()
 input_trait(::StationaryKernel) = StationaryInput()
 input_trait(::IsotropicKernel) = IsotropicInput()
-input_trait(::Dot) = DotProductInput()
+input_trait(::Union{Dot, ExponentialDot}) = DotProductInput()
 input_trait(P::Power) = input_trait(P.k)
 function input_trait(S::ProductsAndSums)
     input_trait.(S.args) isa NTuple ? input_trait(S.arg[1]) : GenericInput()

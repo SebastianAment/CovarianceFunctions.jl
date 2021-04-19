@@ -228,9 +228,10 @@ uuid = "c8e1da08-722c-5040-9ed9-7db0dc04731e"
 version = "1.3.0"
 
 [[JLLWrappers]]
-git-tree-sha1 = "a431f5f2ca3f4feef3bd7a5e94b8b8d4f2f647a0"
+deps = ["Preferences"]
+git-tree-sha1 = "642a199af8b68253517b80bd3bfd17eb4e84df6e"
 uuid = "692b3bcd-3c85-4b1f-b108-f13ce0eb3210"
-version = "1.2.0"
+version = "1.3.0"
 
 [[JSON]]
 deps = ["Dates", "Mmap", "Parsers", "Unicode"]
@@ -380,9 +381,9 @@ uuid = "14a3606d-f60d-562e-9121-12d972cd8159"
 
 [[MutableArithmetics]]
 deps = ["LinearAlgebra", "SparseArrays", "Test"]
-git-tree-sha1 = "952f8c39ba1eaaf416101faa4379ebb21cd48fed"
+git-tree-sha1 = "3301e152b9a208745fad6cd4b068307a5d218a38"
 uuid = "d8a4904e-b15c-11e9-3269-09a3773c0cb0"
-version = "0.2.17"
+version = "0.2.18"
 
 [[NaNMath]]
 git-tree-sha1 = "bfe47e760d60b82b66b61d2d44128b62e3a369fb"
@@ -435,6 +436,12 @@ uuid = "44cfe95a-1eb2-52ea-b672-e2afdf69b78f"
 deps = ["Intervals", "LinearAlgebra", "OffsetArrays", "RecipesBase"]
 git-tree-sha1 = "0b15f3597b01eb76764dd03c3c23d6679a3c32c8"
 uuid = "f27b6e38-b328-58d1-80ce-0feddd5e7a45"
+version = "1.2.1"
+
+[[Preferences]]
+deps = ["TOML"]
+git-tree-sha1 = "ea79e4c9077208cd3bc5d29631a26bc0cff78902"
+uuid = "21216c6a-2e73-6563-6e65-726566657250"
 version = "1.2.1"
 
 [[Printf]]
@@ -573,7 +580,7 @@ uuid = "4ec0a83e-493e-50e2-b9ac-8f72acf5a8f5"
 
 [[WoodburyIdentity]]
 deps = ["BenchmarkTools", "LazyInverse", "LinearAlgebra", "LinearAlgebraExtensions", "Test"]
-git-tree-sha1 = "492788a717880c286d660d13e7e028a8b6783880"
+git-tree-sha1 = "9b7ac0e7ddae6de5c095cd0178fcd63b2172d498"
 repo-rev = "master"
 repo-url = "git@github.com:SebastianAment/WoodburyIdentity.jl.git"
 uuid = "49563772-d9e4-48b4-a8b6-4cbe661ead9f"

@@ -23,7 +23,6 @@ using WoodburyIdentity
 const AbstractVecOfVec{T} = AbstractVector{<:AbstractVector{T}}
 const AbstractVecOfVecOrMat{T} = AbstractVector{<:AbstractVecOrMat{T}}
 
-
 abstract type AbstractKernel{T} end
 abstract type MercerKernel{T} <: AbstractKernel{T} end
 abstract type StationaryKernel{T} <: MercerKernel{T} end
