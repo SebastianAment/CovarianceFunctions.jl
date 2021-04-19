@@ -14,7 +14,10 @@ using LinearAlgebra
     d = 3
     x, y = randn(d), randn(d)
     @test (Dot()^3)(x, y) ≈ Poly(3)(x, y)
-    @test ExponentialDot()(x, y) ≈ exp(dot(x, y))
+    E = ExponentialDot()
+    @test E(x, y) ≈ exp(dot(x, y))
+    @test E(x, y) ≈ E(y, x)
+
 end
 
 @testset "mercer" begin

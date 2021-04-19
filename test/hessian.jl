@@ -1,7 +1,7 @@
 module TestHessian
 using Test
 using CovarianceFunctions
-using CovarianceFunctions: EQ, RQ, Dot, NN
+using CovarianceFunctions: EQ, RQ, Dot, ExponentialDot, NN
 using CovarianceFunctions: HessianKernel, ValueGradientHessianKernel,
                            input_trait, BlockFactorization,
                            HessianKernelElement, ValueGradientHessianKernelElement
@@ -12,10 +12,10 @@ const AbstractMatOrFac = Union{AbstractMatrix, Factorization}
     # nd test
     n = 2
     d = 3
-    X = randn(d, n)
+    X = randn(d, n) / sqrt(d)
     ε = 2eps()
     @testset "HessianKernelElement" begin
-        kernels = [EQ(), RQ(1.), Dot()^2, Dot()^4] #, NN()]
+        kernels = [EQ(), RQ(1.), Dot()^4, ExponentialDot()] #, NN()]
         for k in kernels
             K = HessianKernel(k)(X[:, 1], X[:, 2])
             @test K isa HessianKernelElement
@@ -101,7 +101,6 @@ const AbstractMatOrFac = Union{AbstractMatrix, Factorization}
         bb = randn(n*dd)
         for k in kernels
             G = ValueGradientHessianKernel(k)
-            display(G)
             K = CovarianceFunctions.gramian(G, X)
             @test K isa BlockFactorization{<:Real}
 

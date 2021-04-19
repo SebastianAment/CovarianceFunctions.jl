@@ -87,7 +87,7 @@ end
 
 ################################################################################
 # in contrast to the AppliedMatrix in LazyArrays, this is not completely lazy
-#in that it calculates intermediate results
+# in that it calculates intermediate results
 struct LazyMatrixProduct{T, AT<:Tuple{Vararg{AbstractMatOrFac}}} <: Factorization{T}
     args::AT
 end
@@ -105,8 +105,8 @@ function Base.size(L::LazyMatrixProduct, i::Int)
 end
 issquare(A::AbstractMatOrFac) = size(A, 1) == size(A, 2)
 # allsquare(L::LazyMatrixProduct) = all(issquare, L.args)
-Base.Matrix(L::LazyMatrixProduct) = prod(L.args)
-Base.AbstractMatrix(L::LazyMatrixProduct) = Matrix(L)
+Base.Matrix(L::LazyMatrixProduct) = prod(Matrix, L.args)
+Base.AbstractMatrix(L::LazyMatrixProduct) = prod(AbstractMatrix, L.args)
 
 Base.:*(L::LazyMatrixProduct, x::AbstractVector) = mul!(similar(x, size(L, 1)), L, x)
 function LinearAlgebra.mul!(y::AbstractVector, L::LazyMatrixProduct, x::AbstractVector, α::Real = 1, β::Real = 0)
@@ -117,7 +117,6 @@ function LinearAlgebra.mul!(y::AbstractVector, L::LazyMatrixProduct, x::Abstract
     @. y = α*z + β*y
     return y
 end
-
 
 # function LinearAlgebra.mul!(y::AbstractVector, L::LazyMatrixProduct, x::AbstractVector, α::Real = 1, β::Real = 0)
 #     if all(issquare, L.args)
@@ -139,6 +138,36 @@ end
 #     end
 #     return y
 # end
+
+################################################################################
+# in contrast to the AppliedMatrix in LazyArrays, this is not completely lazy
+# in that it calculates intermediate results
+struct LazyMatrixSum{T, AT<:Tuple{Vararg{AbstractMatOrFac}}} <: Factorization{T}
+    args::AT
+end
+LazyMatrixSum{T}(args) where T = LazyMatrixSum{T, typeof(args)}(args)
+LazyMatrixSum(args) = LazyMatrixSum{Float64}(args)
+
+function Base.size(L::LazyMatrixSum, i::Int)
+    if i == 1
+        size(L.args[1], 1)
+    elseif i == 2
+        size(L.args[end], 2)
+    else
+        1
+    end
+end
+Base.Matrix(L::LazyMatrixSum) = sum(Matrix, L.args)
+Base.AbstractMatrix(L::LazyMatrixSum) = sum(AbstractMatrix, L.args)
+
+Base.:*(L::LazyMatrixSum, x::AbstractVector) = mul!(similar(x, size(L, 1)), L, x)
+function LinearAlgebra.mul!(y::AbstractVector, L::LazyMatrixSum, x::AbstractVector, α::Real = 1, β::Real = 0)
+    @. y = β*y
+    for A in L.args
+        mul!(y, A, x, α, 1)
+    end
+    return y
+end
 
 ######################### perfect shuffle matrices #############################
 function perfect_shuffle(n::Int)

@@ -123,10 +123,7 @@ function gramian(G::GradientKernel{<:Real, <:ScaledInputKernel},  x::AbstractVec
     n, m = length(x), length(y)
     # U = kronecker(I(n), G.k.U)
     U = Diagonal(Fill(G.k.U, n))
-    display(U)
     k = GradientKernel(G.k.k)
-    println(typeof(k))
-    println(typeof(gramian(k, x, y)))
     LazyMatrixProduct((U', gramian(k, x, y), U))
 end
 
@@ -328,6 +325,7 @@ _derivative_helper(k::EQ) = f(r²) = exp(-r²/2)
 _derivative_helper(k::RQ) = f(r²) = inv(1 + r² / (2*k.α))^k.α
 _derivative_helper(k::Constant) = f(r²) = k.c
 _derivative_helper(k::Dot) = f(r²) = r²
+_derivative_helper(k::ExponentialDot) = f(r²) = exp(r²)
 _derivative_helper(k::Power) = f(r²) = _derivative_helper(k.k)(r²)^k.p
 function _derivative_helper(k::Sum)
     summands = _derivative_helper.(k.args)

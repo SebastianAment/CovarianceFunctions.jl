@@ -1,7 +1,7 @@
 module TestGradient
 using Test
 using CovarianceFunctions
-using CovarianceFunctions: EQ, RQ, Dot, NN
+using CovarianceFunctions: EQ, RQ, Dot, ExponentialDot, NN
 using CovarianceFunctions: GradientKernel, ValueGradientKernel,
                            DerivativeKernel, ValueDerivativeKernel,
                            input_trait, BlockFactorization
@@ -12,10 +12,10 @@ const AbstractMatOrFac = Union{AbstractMatrix, Factorization}
     # nd test
     n = 32
     d = 16
-    X = randn(d, n)
+    X = randn(d, n) / sqrt(d)
     ε = 1e4eps()
     @testset "GradientKernel" begin
-        kernels = [EQ(), RQ(1.), Dot(), Dot()^3, NN()]
+        kernels = [EQ(), RQ(1.), Dot()^3, ExponentialDot(), NN()]
         a = randn(d*n)
         b = randn(d*n)
         for k in kernels
