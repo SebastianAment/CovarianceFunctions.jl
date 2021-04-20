@@ -10,6 +10,7 @@ end
 add(x) = Pkg.add(Pkg.PackageSpec(url = git * x * ".git"))
 
 add("LazyInverse.jl")
+add("LazyLinearAlgebra.jl")
 add("LinearAlgebraExtensions.jl")
 add("KroneckerProducts.jl")
 add("WoodburyIdentity.jl")

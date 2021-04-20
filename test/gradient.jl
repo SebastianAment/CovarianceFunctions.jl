@@ -118,12 +118,10 @@ const AbstractMatOrFac = Union{AbstractMatrix, Factorization}
         K = CovarianceFunctions.gramian(G, x)
         MK = Matrix(K)
         @test issymmetric(MK)
-        @test isposdef(MK)
+        @test all(≥(-1e-10), eigvals(MK)) # positive semidefinite
         @test size(K) == (2n, 2n)
         @test size(MK) == (2n, 2n)
     end
 end
-
-
 
 end

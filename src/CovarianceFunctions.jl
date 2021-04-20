@@ -14,8 +14,8 @@ using DiffResults
 
 using SpecialFunctions: gamma, besselk
 
-# type unions we need often:
-using LinearAlgebraExtensions
+using LazyLinearAlgebra
+using LinearAlgebraExtensions # TODO: check how much of this we are using except cholesky
 using LinearAlgebraExtensions: AbstractMatOrFac
 using KroneckerProducts
 using WoodburyIdentity
@@ -36,7 +36,6 @@ Base.getindex(K::MultiKernel, i, j) = (x, y) -> getindex(K(x, y), i, j)
 # first, utility functions
 include("util.jl")
 include("derivatives.jl")
-include("block.jl")
 include("parameters.jl")
 
 # include all types of kernels
