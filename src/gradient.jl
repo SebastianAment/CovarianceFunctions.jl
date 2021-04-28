@@ -1,4 +1,6 @@
 # implementation of derivative and gradient kernel
+import LazyLinearAlgebra: evaluate_block!
+
 ########################### Gradient kernel ####################################
 # f ∼ GP(μ, k)
 # ∂f ∼ GP(∂μ, dkxy) # gradient kernel
@@ -115,7 +117,7 @@ function gradient_kernel!(K::Woodbury, k::NeuralNetwork, x, y, ::GenericInput = 
 end
 
 # necessary for blockmul! of BlockFactorization
-function evaluate!(K::AbstractMatOrFac, G::GradientKernel, x::AbstractVector, y::AbstractVector, T::InputTrait = input_trait(G))
+function evaluate_block!(K::AbstractMatOrFac, G::GradientKernel, x::AbstractVector, y::AbstractVector, T::InputTrait = input_trait(G))
     gradient_kernel!(K, G.k, x, y, T)
 end
 
@@ -234,7 +236,7 @@ function value_gradient_kernel!(K::BlockFactorization, k, x::AbstractVector, y::
     return K
 end
 
-function evaluate!(K::BlockFactorization, G::ValueGradientKernel, x::AbstractVector, y::AbstractVector, T::InputTrait = input_trait(G.k))
+function LazyLinearAlgebra.evaluate_block!(K::BlockFactorization, G::ValueGradientKernel, x::AbstractVector, y::AbstractVector, T::InputTrait = input_trait(G.k))
     value_gradient_kernel!(K, G.k, x, y, T)
 end
 

@@ -4,7 +4,9 @@ using CovarianceFunctions
 using CovarianceFunctions: EQ, RQ, Dot, ExponentialDot, NN
 using CovarianceFunctions: HessianKernel, ValueGradientHessianKernel,
                            input_trait, BlockFactorization,
-                           HessianKernelElement, ValueGradientHessianKernelElement
+                           IsotropicHessianKernelElement,
+                           DotProductHessianKernelElement,
+                           ValueGradientHessianKernelElement
 using LinearAlgebra
 const AbstractMatOrFac = Union{AbstractMatrix, Factorization}
 
@@ -14,11 +16,11 @@ const AbstractMatOrFac = Union{AbstractMatrix, Factorization}
     d = 3
     X = randn(d, n) / sqrt(d)
     ε = 2eps()
-    @testset "HessianKernelElement" begin
+    @testset "HessianKernelElements" begin
         kernels = [EQ(), RQ(1.), Dot()^4, ExponentialDot()] #, NN()]
         for k in kernels
             K = HessianKernel(k)(X[:, 1], X[:, 2])
-            @test K isa HessianKernelElement
+            @test K isa Union{IsotropicHessianKernelElement, DotProductHessianKernelElement}
             H = HessianKernel((x, y) -> k(x, y))(X[:, 1], X[:, 2])
             @test H isa Matrix{<:Real}
             @test size(K) == (d^2, d^2)

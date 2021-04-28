@@ -15,6 +15,7 @@ using DiffResults
 using SpecialFunctions: gamma, besselk
 
 using LazyLinearAlgebra
+using LazyLinearAlgebra: evaluate_block!
 using LinearAlgebraExtensions # TODO: check how much of this we are using except cholesky
 using LinearAlgebraExtensions: AbstractMatOrFac
 using KroneckerProducts

@@ -1,3 +1,5 @@
+import LazyLinearAlgebra: evaluate_block!
+
 # IDEA: GradientLaplacianKernel?
 struct HessianKernel{T, K} <: MultiKernel{T}
     k::K
@@ -41,172 +43,239 @@ function hessian_kernel!(K::AbstractMatrix, k, x::AbstractVector, y::AbstractVec
 end
 
 ############################ Lazy Kernel Element ###############################
-struct HessianKernelElement{T, K, X<:AbstractVector{T}, Y} <: Factorization{T}
+# struct HessianKernelElement{T, K, X<:AbstractVector{T}, Y} <: Factorization{T}
+#     k::K
+#     x::X
+#     y::Y
+#     # input_trait::IT
+# end
+#
+# # HessianKernelElement(k, x, y) = HessianKernelElement(k, x, y, input_trait(k))
+# function Base.size(K::HessianKernelElement)
+#     d = length(K.x)
+#     (d^2, d^2)
+# end
+# Base.size(K::HessianKernelElement, i::Int) = 0 < i ≤ 2 ? size(K)[i] : 1
+
+# function allocate_hessian_kernel(k, x, y, T::Union{IsotropicInput, DotProductInput})
+#     HessianKernelElement(k, copy(x), copy(y))
+# end
+
+# function hessian_kernel!(K::HessianKernelElement, k, x::AbstractVector, y::AbstractVector, T::Union{IsotropicInput, DotProductInput})
+#     K.x .= x; K.y .= y
+#     return K
+# end
+
+# function evaluate_block!(K::HessianKernelElement, G::HessianKernel, x::AbstractVector, y::AbstractVector, T::InputTrait = input_trait(G))
+#     hessian_kernel!(K, G.k, x, y, T)
+# end
+
+########################## Isotropic Hessian Kernel ############################
+struct IsotropicHessianKernelElement{T, K, R<:AbstractVector{T}, RR<:AbstractMatrix,
+                                     UT, CT, KD} <: Factorization{T}
     k::K
-    x::X
-    y::Y
-    # input_trait::IT
-    # r
-    # U::UT # for [vId, rr]
-    # Ua
-    # CUa
-    # C::CT
+    r::R
+    rr::RR # r*r'
+    U::UT # for [vId, rr]
+    C::CT
+    kd::KD
+
+    # these could have different element type depending on input
+    # Ua::
+    # CUa::
     # Ar::AT
-    #
+    # BA
 end
-# HessianKernelElement(k, x, y) = HessianKernelElement(k, x, y, input_trait(k))
-function Base.size(K::HessianKernelElement)
-    d = length(K.x)
+function IsotropicHessianKernelElement(k, x, y)
+    # universal variables
+    d = length(x)
+    Id = I(d)
+    vId = vec(Id)
+
+    r = x - y
+    rr = r * r'
+    vrr = vec(rr)
+    T = eltype(r)
+    U = hcat(vId, vrr) # micro optimization IDEA: could link second column to rr via view
+    C = zeros(T, (2, 2))
+
+    r² = sum(abs2, r)
+    f = _derivative_helper(k)
+    kd = derivatives(f, r², 4)[2:end] # get first to fourth derivative
+    @. kd = kd * 2^(1:4) # constant adjustment since kernels are function of r², not r²/2
+
+    # Ua = zeros(T, 2)
+    # CUa = zeros(T, 2)
+    # Ar = zeros(T, d)
+    # BA = zeros(T, (d, d))
+    IsotropicHessianKernelElement(k, r, rr, U, C, kd) #, Ua, CUa, Ar, BA)
+end
+function Base.size(K::IsotropicHessianKernelElement)
+    d = length(K.r)
     (d^2, d^2)
 end
-Base.size(K::HessianKernelElement, i::Int) = 0 < i ≤ 2 ? size(K)[i] : 1
+Base.size(K::IsotropicHessianKernelElement, i::Int) = 0 < i ≤ 2 ? size(K)[i] : 1
 
-function allocate_hessian_kernel(k, x, y, T::Union{IsotropicInput, DotProductInput})
-    HessianKernelElement(k, copy(x), copy(y))
+function allocate_hessian_kernel(k, x, y, ::IsotropicInput)
+    IsotropicHessianKernelElement(k, copy(x), copy(y))
 end
-function hessian_kernel!(K::HessianKernelElement, k, x::AbstractVector, y::AbstractVector, T::Union{IsotropicInput, DotProductInput})
-    K.x .= x; K.y .= y
+
+function evaluate_block!(K::IsotropicHessianKernelElement, G::HessianKernel, x::AbstractVector, y::AbstractVector, ::IsotropicInput = IsotropicInput())
+    hessian_kernel!(K, G.k, x, y)
+end
+
+function hessian_kernel!(K::IsotropicHessianKernelElement, k, x::AbstractVector, y::AbstractVector, ::IsotropicInput = IsotropicInput())
+    @. K.r = x-y
+    @. K.rr = K.r*K.r'
+    r² = sum(abs2, K.r)
+    f = _derivative_helper(k)
+    K.kd .= derivatives(f, r², 4)[2:end] # get first to fourth derivative
+    @. K.kd = K.kd * 2^(1:4) # constant adjustment since kernels are function of r², not r²/2
+
+    @. K.U[:, 2] = $vec(K.rr) # [vec(Id) vec(rr)], only rr changes
+    K.C[1, 1] = K.kd[2]
+    K.C[2, 1] = K.kd[3]
+    K.C[1, 2] = K.kd[3]
+    K.C[2, 2] = K.kd[4]
     return K
 end
 
-function evaluate!(K::HessianKernelElement, G::HessianKernel, x::AbstractVector, y::AbstractVector, T::InputTrait = input_trait(G))
-    hessian_kernel!(K, G.k, x, y, T)
-end
+function Base.Matrix(K::IsotropicHessianKernelElement)
+    r = K.r
+    rr = vec(K.rr)
+    r² = sum(abs2, r)
 
-########################## Isotropic Hessian Kernel ############################
-Base.Matrix(K::HessianKernelElement) = Matrix(K, input_trait(K.k))
-function Base.Matrix(K::HessianKernelElement, ::IsotropicInput)
-    k, x, y = K.k, K.x, K.y
-    d = length(x)
-    # universal variables
-    Id, Id2 = I(d), I(d^2)
-    vId = vec(Id)
+    d = length(r)
     S = perfect_shuffle(d)
 
-    # specific variables
-    r = x - y
-    rr = vec(r*r')
-    r² = norm(r)^2
-
-    f = _derivative_helper(k)
-    kd = derivatives(f, r², 4) # get first to fourth derivative
-    kd = kd[2:end]
-    kd = @. kd * 2^(1:4) # constant adjustment
     B = kron(I(d), r*r') + kron(r*r', I(d))
-    U = [vec(Id) rr]
-    HH = U * [kd[2] kd[3]; kd[3] kd[4]] * U' # Hessian-Hessian
-    HH .+= (S + Id2) * (kd[2] * I(d^2) + kd[3] * B)
+    HH = K.U * K.C * K.U' # Hessian-Hessian
+    HH .+= (S + I(d^2)) * (K.kd[2] * I(d^2) + K.kd[3] * B)
 end
 
-function LinearAlgebra.mul!(b::AbstractVector, K::HessianKernelElement, a::AbstractVector, α::Real = 1, β::Real = 0)
-    mul!(b, K, a, α, β, input_trait(K.k))
-end
-
-function LinearAlgebra.mul!(b::AbstractVector, K::HessianKernelElement, a::AbstractVector,
-                            α::Real, β::Real, ::IsotropicInput)
-    k, x, y = K.k, K.x, K.y
-    d = length(x)
+function LinearAlgebra.mul!(b::AbstractVector, K::IsotropicHessianKernelElement,
+                            a::AbstractVector, α::Real = 1, β::Real = 0)
+    d = length(K.r)
     d^2 == length(a) == length(b) || throw(DimensionMismatch())
-
-    # universal variables
-    Id, Id2 = I(d), I(d^2)
-    vId = vec(Id)
-
-    # specific variables
-    r = x - y
-    rr = vec(r*r')
-    r² = norm(r)^2
-
-    f = _derivative_helper(k)
-    kd = derivatives(f, r², 4)[2:end] # get first to fourth derivative
-    kd = @. kd * 2^(1:4) # constant adjustment
-
     # below: multiplying by
-    # [vec(Id) rr] * [kd[2] kd[3]; kd[3] kd[4]] * [vec(Id) rr]'
-    U = hcat(vId, rr)
-    C = zeros(2, 2)
-    C[1, 1] = kd[2]
-    C[2, 1] = kd[3]
-    C[1, 2] = kd[3]
-    C[2, 2] = kd[4]
-    Ua = U'a
-    mul!(b, U, C*Ua, α, β)
+    # [vec(Id) vec(rr)] * [kd[2] kd[3]; kd[3] kd[4]] * [vec(Id) rr]' i.e. U * C * U'
+    # mul!(K.Ua, U', a) # Ua = U'a # this is tricky, because a might have different type
+    # mul!(K.CUa, C, K.Ua) # CUa = C*U'a
+    Ua = K.U' * a # more general, and these are 2 vectors
+    CUa = K.C * Ua
+    mul!(b, K.U, CUa, α, β)
 
     # below: multiplying with (Id2 + Shuffle)
+    kd = K.kd
     A = reshape(a, d, d)
     @. b += α * kd[2] * a # I*a
-    @. b += α * kd[2] * $vec(A') # + S*a where S is perfect_shuffle
+    at = vec(A') # S*a where S is perfect_shuffle
+    @. b += α * kd[2] * at
 
     # below: multiplying with
     # (Id2 + Shuffle) * f3(rn) * B, where
     # B = kronecker(Id, r*r') + kronecker(r*r', Id)
-    BA = zeros(d, d)
-    Ar = zeros(d)
-    mul!(Ar, A, r)
-    @. BA += (Ar*r') # A * rr' # this could in principle act on b
-    mul!(Ar, A', r)
-    @. BA += (r*Ar') # rr * A
-    @. b += α * kd[3] * ($vec(BA) + $vec(BA'))
+    # BA = zeros(d, d)
+    # Ar = zeros(d)
+    # mul!(K.Ar, A, K.r)
+    # @. K.BA += (K.Ar*K.r') # A * rr' # this could in principle act on b
+    # mul!(K.Ar, A', K.r)
+    # @. K.BA += (K.r*K.Ar') # rr * A
+    # @. b += α * kd[3] * ($vec(K.BA) + $vec(K.BA'))
+
+    Ar = A * K.r # d vector
+    BA = Ar * K.r' # A * rr' - d x d matrix
+    mul!(Ar, A', K.r)
+    @. BA += K.r * Ar' # rr * A
+    @. b += α * kd[3] * $vec(BA)
+    @. b += α * kd[3] * $vec(BA')
     return b
 end
 
 ####################### Hessian DotProductInput Kernel #########################
-function Base.Matrix(K::HessianKernelElement, ::DotProductInput)
-    k, x, y = K.k, K.x, K.y
-    d = length(x)
-    # universal variables
-    Id2 = I(d^2)
-    S = perfect_shuffle(d)
-
-    # specific variables
-    xy = dot(x, y)
-    yx = y*x'
-    xx = vec(x*x')
-    yy = vec(y*y')
-
-    f = _derivative_helper(k)
-    kd = derivatives(f, xy, 4)[2:end] # get first to fourth derivative
-
-    B = kron(I(d), yx) + kron(yx, I(d))
-    HH = (Id2 + S) * (kd[2] * Id2 + kd[3] * B) +  kd[4] * (yy * xx')
+struct DotProductHessianKernelElement{T, K, X<:AbstractVector{T}, Y<:AbstractVector,
+                XX<:AbstractMatrix{T}, YY<:AbstractMatrix, KD} <: Factorization{T}
+    k::K
+    x::X
+    y::Y
+    xx::XX
+    yy::YY
+    kd::KD
 end
-
-function LinearAlgebra.mul!(b::AbstractVector, K::HessianKernelElement, a::AbstractVector,
-                            α::Real, β::Real, ::DotProductInput)
-    k, x, y = K.k, K.x, K.y
-    d = length(x)
-    d^2 == length(a) == length(b) || throw(DimensionMismatch())
+function DotProductHessianKernelElement(k, x, y)
     # universal variables
+    d = length(x)
     Id, Id2 = I(d), I(d^2)
     vId = vec(Id)
-
-    # specific variables
     xy = dot(x, y)
-    yx = y*x'
-    xx = vec(x*x')
-    yy = vec(y*y')
-
+    xx = x*x'
+    yy = y*y'
     f = _derivative_helper(k)
-    kd = derivatives(f, xy, 4)[2:end] # get first to fourth derivative
-    # below: multiplying by
+    kd = derivatives(f, xy, 4)[2:end]
+    DotProductHessianKernelElement(k, x, y, xx, yy, kd)
+end
+function Base.size(K::DotProductHessianKernelElement)
+    d = length(K.x)
+    (d^2, d^2)
+end
+Base.size(K::DotProductHessianKernelElement, i::Int) = 0 < i ≤ 2 ? size(K)[i] : 1
+
+function allocate_hessian_kernel(k, x, y, ::DotProductInput)
+    DotProductHessianKernelElement(k, copy(x), copy(y))
+end
+# necessary for BlockFactorization
+function evaluate_block!(K::DotProductHessianKernelElement, G::HessianKernel, x::AbstractVector, y::AbstractVector, ::DotProductInput = DotProductInput())
+    hessian_kernel!(K, G.k, x, y)
+end
+function hessian_kernel!(K::DotProductHessianKernelElement, k, x::AbstractVector, y::AbstractVector, ::DotProductInput = DotProductInput())
+    @. K.x = x
+    @. K.y = y
+    @. K.xx = x*x'
+    @. K.yy = y*y'
+    xy = dot(x, y)
+    f = _derivative_helper(K.k)
+    K.kd .= derivatives(f, xy, 4)[2:end] # get first to fourth derivative
+    return K
+end
+function LinearAlgebra.mul!(b::AbstractVector, K::DotProductHessianKernelElement, a::AbstractVector,
+                            α::Real, β::Real)
+    d = size(K.xx, 1)
+    d^2 == length(a) == length(b) || throw(DimensionMismatch())
+    xx, yy = vec(K.xx), vec(K.yy)
+
+    # below: multiplying by yy * xx'
     @. b *= β
     xxa = dot(xx, a)
-    @. b += α * kd[4] * yy * xxa
+    @. b += α * K.kd[4] * yy * xxa
 
     # below: multiplying with (Id2 + Shuffle)
     A = reshape(a, d, d)
-    @. b += α * kd[2] * a # I*a
-    @. b += α * kd[2] * $vec(A') # + S*a where S is perfect_shuffle
+    @. b += α * K.kd[2] * a # I*a
+    @. b += α * K.kd[2] * $vec(A') # + S*a where S is perfect_shuffle
 
-    # below: multiplying with
+    # below: multiplying with kron(I(d), yx) + kron(yx, I(d))
     BA = zeros(d, d)
     Av = zeros(d)
-    mul!(Av, A, x)
-    @. BA += (Av*y') # A * y*x' # this could in principle act on b
-    mul!(Av, A', x)
-    @. BA += (y*Av') # y*x' * A
-    @. b += α * kd[3] * ($vec(BA) + $vec(BA'))
+    mul!(Av, A, K.x)
+    @. BA += (Av*K.y') # A * y*x' # this could in principle act on b
+    mul!(Av, A', K.x)
+    @. BA += (K.y*Av') # y*x' * A
+    @. b += α * K.kd[3] * $vec(BA)
+    @. b += α * K.kd[3] * $vec(BA')
     return b
+end
+function Base.Matrix(K::DotProductHessianKernelElement)
+    d = length(K.x)
+    # universal variables
+    Id2 = I(d^2)
+    S = perfect_shuffle(d)
+    # specific variables
+    yx = K.y*K.x'
+    xx = vec(K.xx)
+    yy = vec(K.yy)
+    kd = K.kd # get first to fourth derivative
+    B = kron(I(d), yx) + kron(yx, I(d))
+    HH = (Id2 + S) * (kd[2] * Id2 + kd[3] * B) + kd[4] * (yy * xx')
 end
 
 ################################################################################
@@ -261,6 +330,7 @@ end
 
 # this is neccesary when evaluate!(::ValueGradientHessianKernel) is called
 # defines mul!
+# TODO: increase pre-allocation
 struct ValueGradientHessianKernelElement{T, K, X<:AbstractVector{T}, Y} <: Factorization{T}
    k::K
    x::X
@@ -274,14 +344,12 @@ struct ValueGradientHessianKernelElement{T, K, X<:AbstractVector{T}, Y} <: Facto
    # BA
 end
 
-# function allocate_value_gradient_hessian_kernel(k, x, y, T::Union{IsotropicInput, DotProductInput})
-#     ValueGradientHessianKernelElement(k, copy(x), copy(y))
-# end
 function value_gradient_hessian_kernel!(K::ValueGradientHessianKernelElement, k, x::AbstractVector, y::AbstractVector, T::Union{IsotropicInput, DotProductInput})
     K.x .= x; K.y .= y
     return K
 end
-function evaluate!(K::ValueGradientHessianKernelElement, G::ValueGradientHessianKernel, x::AbstractVector, y::AbstractVector, T::InputTrait = input_trait(G.k))
+
+function evaluate_block!(K::ValueGradientHessianKernelElement, G::ValueGradientHessianKernel, x::AbstractVector, y::AbstractVector, T::InputTrait = input_trait(G.k))
     value_gradient_hessian_kernel!(K, G.k, x, y, T)
 end
 

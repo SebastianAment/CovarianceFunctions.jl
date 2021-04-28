@@ -49,7 +49,7 @@ end
 # need this for blockmul! to work in BlockFactorization
 # specialization for Gramians of matrix-valued kernels
 function LazyLinearAlgebra.evaluate_block!(Gij, G::Gramian{<:AbstractMatOrFac}, i::Int, j::Int)
-    evaluate!(Gij, G.k, G.x[i], G.y[j], input_trait(G.k))
+    evaluate_block!(Gij, G.k, G.x[i], G.y[j], input_trait(G.k))
 end
 
 # by default, Gramians of matrix-valued kernels are BlockFactorizations
