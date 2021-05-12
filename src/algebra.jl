@@ -89,7 +89,7 @@ end
 
 # both x and y have to be vectors of inputs to individual kernels
 # could also consist of tuples ... so restricting to AbstractVector might not be good
-function (K::SeparableProduct)(x, y)
+function (K::SeparableProduct)(x::AbstractVector, y::AbstractVector)
     checklength(x, y)
     val = one(eltype(K))
     for (i, k) in enumerate(K.args)
@@ -122,8 +122,7 @@ function Base.similar(k::SeparableSum, θ::AbstractVector)
     SeparableSum(_similar_helper(k, θ))
 end
 
-# TODO: check input lengths
-function (K::SeparableSum)(x, y)
+function (K::SeparableSum)(x::AbstractVector, y::AbstractVector)
     checklength(x, y)
     val = zero(eltype(K))
     for (i, k) in enumerate(K.args)
@@ -144,50 +143,3 @@ separable(::typeof(+), k::AbstractKernel...) = SeparableSum(k)
 function separable(::typeof(^), k::AbstractKernel, d::Integer)
     SeparableProduct(tuple((k for _ in 1:d)...))
 end
-
-######################## Kernel Input Transfomations ###########################
-############################ Symmetric Kernel ##################################
-# make this useable for multi-dimensional inputs!
-# in more dimensions, could have more general axis of symmetry
-struct SymmetricKernel{T, K<:AbstractKernel} <: AbstractKernel{T}
-    k::K # kernel to be symmetrized
-    z::T # center
-end
-parameters(k::SymmetricKernel) = vcat(parameters(k.k), k.z)
-nparameters(k::SymmetricKernel) = nparameters(k.k) + 1
-function Base.similar(k::SymmetricKernel, θ::AbstractVector)
-    n = checklength(k, θ)
-    k = similar(k.k, @view(θ[1:n-1]))
-    SymmetricKernel(k, θ[n])
-end
-# const Sym = Symmetric
-SymmetricKernel(k::AbstractKernel{T}) where T = SymmetricKernel(k, zero(T))
-
-# for 1D axis symmetry
-function (k::SymmetricKernel)(x, y)
-    x -= k.z; y -= k.z;
-    (k.k(x, y) + k.k(-x, y))/2
-end
-
-######################## Kernel output transformations #########################
-############################## rescaled kernel #################################
-# TODO: should be called DiagonalRescaling in analogy to the matrix case
-# diagonal rescaling of covariance functions
-# generalizes multiplying by constant kernel to multiplying by function
-struct VerticalRescaling{T, K<:AbstractKernel{T}, F} <: AbstractKernel{T}
-    k::K
-    a::F
-end
-parameters(k::VerticalRescaling) = vcat(parameters(k.k), parameters(k.a))
-nparameters(k::VerticalRescaling) = nparameters(k.k) + nparameters(k.a)
-
-(k::VerticalRescaling)(x, y) = k.a(x) * k.k(x, y) * k.a(y)
-# TODO: preserve structure if k.k is stationary and x, y are regular grids,
-# since that introduces Toeplitz structure
-# function gramian(k::VerticalRescaling, x::AbstractVector, y::AbstractVector)
-#     # Diagonal(k.a.(x)) * gramian(k.k, x, y) * Diagonal(k.a.(y)))
-#     LazyProduct(Diagonal(k.a.(x)), gramian(k.k, x, y), Diagonal(k.a.(y))))
-# end
-
-# normalizes an arbitary kernel so that k(x,x) = 1
-normalize(k::AbstractKernel) = VerticalRescaling(k, x->1/√k(x, x))

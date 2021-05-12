@@ -102,3 +102,31 @@ function perfect_shuffle(n::Int, m::Int)
     end
     return S
 end
+
+# exchange matrix (anti-diagonal identity matrix)
+function exchange_matrix(r::Int)
+    E = spzeros(r, r)
+    for i in 1:r
+        E[r-i+1, i] = 1
+    end
+    return E
+end
+
+# function anti_diagonal(x::AbstractVector)
+#     i = tuple.(r:-1:1, 1:r)
+# end
+
+# computes all products of subsets of length(x)-1 elements of x and stores them in x
+function leave_one_out_products!(x::AbstractArray)
+    nz = sum(iszero, x)
+    if nz == 0
+        @. x = $prod(x) / x
+    else
+        @. x = 0 # with more than two zeros, all leave-one-out products will be zero
+        if nz == 1
+            i = findfirst(iszero, x)
+            x[i] = prod(x[1:length(x) .!= i])
+        end
+    end
+    return x
+end

@@ -4,26 +4,31 @@ import LazyLinearAlgebra: evaluate_block!
 ########################### Gradient kernel ####################################
 # f ∼ GP(μ, k)
 # ∂f ∼ GP(∂μ, dkxy) # gradient kernel
-struct GradientKernel{T, K} <: MultiKernel{T}
+struct GradientKernel{T, K, IT<:InputTrait} <: MultiKernel{T}
     k::K
-    # input_type::IT  IT<:InputTrait
-    # could add temporary storage for gradient calculation here
+    input_trait::IT
+    function GradientKernel{T, K}(k, it = input_trait(k)) where {T, K}
+        new{T, K, typeof(it)}(k, it)
+    end
 end
-GradientKernel(k::AbstractKernel{T}) where {T} = GradientKernel{T, typeof(k)}(k)
-GradientKernel(k) = GradientKernel{Float64, typeof(k)}(k) # use fieldtype here?
-
-input_trait(G::GradientKernel) = input_trait(G.k)
+GradientKernel(k::AbstractKernel{T}) where T = GradientKernel{T, typeof(k)}(k)
+GradientKernel(k) = GradientKernel{Float64, typeof(k)}(k)
+input_trait(G::GradientKernel) = G.input_trait
 
 function elsize(G::Gramian{<:AbstractMatrix, <:GradientKernel}, i::Int)
     i ≤ 2 ? length(G.x[1]) : 1
 end
 
-# IDEA: input_trait(G.k) could be pre-computed
 function (G::GradientKernel)(x::AbstractVector, y::AbstractVector)
     gradient_kernel(G.k, x, y, input_trait(G.k))
 end
 
-function gradient_kernel(k, x::AbstractVector, y::AbstractVector, T::InputTrait)#::GenericInput = GenericInput())
+# necessary for blockmul! of BlockFactorization
+function evaluate_block!(K::AbstractMatOrFac, G::GradientKernel, x::AbstractVector, y::AbstractVector, T::InputTrait = input_trait(G))
+    gradient_kernel!(K, G.k, x, y, T)
+end
+
+function gradient_kernel(k, x::AbstractVector, y::AbstractVector, T::InputTrait) #::GenericInput = GenericInput())
     K = allocate_gradient_kernel(k, x, y, T)
     gradient_kernel!(K, k, x, y, T)
 end
@@ -80,6 +85,17 @@ function gradient_kernel!(K::Woodbury, k, x::AbstractVector, y::AbstractVector, 
     return K
 end
 
+############################# Constant Kernel ##################################
+# specialization of gradient nn kernel, written before more general AD-implementation,
+# which obviates the need for special derivations like these
+function allocate_gradient_kernel(k::Constant, x, y, ::InputTrait)
+    Zeros(length(x), length(y))
+end
+gradient_kernel!(K::Zeros, k::Constant, x, y, ::InputTrait) = K
+
+########################### Neural Network Kernel ##############################
+# specialization of gradient nn kernel, written before more general AD-implementation,
+# which obviates the need for special derivations like these
 function allocate_gradient_kernel(k::NeuralNetwork, x, y, ::GenericInput)
     U = hcat(x, y)
     D = Diagonal(similar(x))
@@ -116,51 +132,194 @@ function gradient_kernel!(K::Woodbury, k::NeuralNetwork, x, y, ::GenericInput = 
     return K
 end
 
-# necessary for blockmul! of BlockFactorization
-function evaluate_block!(K::AbstractMatOrFac, G::GradientKernel, x::AbstractVector, y::AbstractVector, T::InputTrait = input_trait(G))
-    gradient_kernel!(K, G.k, x, y, T)
+############################ Gradient Algebra ##################################
+################################# Sum ##########################################
+# allocates space for gradient kernel evaluation but does not evaluate
+# separation from evaluation useful for ValueGradientKernel
+function allocate_gradient_kernel(k::Sum, x, y, ::GenericInput)
+    H = (allocate_gradient_kernel(h, x, y, input_trait(h)) for h in k.args)
+    LazyMatrixSum(H...)
+end
+
+function gradient_kernel!(K::LazyMatrixSum, k::Sum, x::AbstractVector, y::AbstractVector, ::GenericInput)
+    for (h, H) in zip(k.args, K.args)
+        gradient_kernel!(H, h, x, y, input_trait(h))
+    end
+    return K
+end
+
+################################ Product #######################################
+# for product kernel with generic input
+function allocate_gradient_kernel(k::Product, x, y, ::GenericInput)
+    d, r = length(x), length(k.args)
+    H = (allocate_gradient_kernel(h, x, y, input_trait(h)) for h in k.args)
+    T = typeof(k(x, y))
+    A = LazyMatrixSum(
+                (LazyMatrixProduct(Diagonal(zeros(T, d)), h) for h in H)...
+                )
+    U = zeros(T, (d, r))
+    V = zeros(T, (d, r))
+    C = Woodbury(I(r), ones(r), ones(r)', -1)
+    Woodbury(A, U, C, V')
+end
+
+function gradient_kernel!(W::Woodbury, k::Product, x::AbstractVector, y::AbstractVector, ::GenericInput = input_trait(k))
+    A = W.A # this is a LazyMatrixSum of LazyMatrixProducts
+    ForwardDiff.jacobian!(W.U, z->k(z, y), x)
+    ForwardDiff.jacobian!(W.V', z->k(x, z), y)
+    k_j = [h(x, y) for h in k.args]
+    k_j .= prod(k_j) ./ k_j
+    r = length(k.args)
+    for i in 1:r
+        h, H = k.args[i], A.args[i]
+        D = H.args[1]
+        @. D.diag = k_j
+        gradient_kernel!(H.args[2], h, x, y, input_trait(h))
+    end
+    return W
+end
+
+############################# Separable Product ################################
+# for product kernel with generic input
+function allocate_gradient_kernel(k::SeparableProduct, x::AbstractVector{<:Number},
+                                  y::AbstractVector{<:Number}, ::GenericInput)
+    d = length(x)
+    H = (allocate_gradient_kernel(h, x, y, input_trait(h)) for h in k.args)
+    T = typeof(k(x, y))
+    A = LazyMatrixProduct(Diagonal(zeros(T, d)), Diagonal(zeros(T, d)))
+    U = Diagonal(zeros(T, d))
+    V = Diagonal(zeros(T, d))
+    C = Woodbury(I(r), ones(r), ones(r)', -1)
+    Woodbury(A, U, C, V)
+end
+
+function gradient_kernel!(W::Woodbury, k::SeparableProduct, x::AbstractVector, y::AbstractVector, ::GenericInput = input_trait(k))
+    A = W.A # this is a LazyMatrixProducts of Diagonals
+    D, H = A.args # first is scaling matrix by leave_one_out_products, second is diagonal of derivative kernels
+    for (i, ki) in enumerate(k.args)
+        xi, yi = x[i], y[i]
+        D.diag[i, i] = ki(xi, yi)
+        W.U[i, i] = ForwardDiff.derivative(z->ki(z, yi), xi)
+        W.V[i, i] = ForwardDiff.derivative(z->ki(xi, z), yi)
+        H[i, i] = DerivativeKernel(ki)(xi, yi)
+    end
+    leave_one_out_products!(D.diag)
+    return W
+end
+
+############################# Separable Sum ####################################
+# IDEA: implement block separable with x::AbstractVecOfVec
+function allocate_gradient_kernel(k::SeparableSum, x::AbstractVector{<:Number},
+                                  y::AbstractVector{<:Number}, ::GenericInput)
+    f, h, d = k.f, k.k, length(x)
+    H = allocate_gradient_kernel(h, x, y, input_trait(h))
+    D = Diagonal(d)
+end
+
+function gradient_kernel!(D::Diagonal, k::SeparableSum, x::AbstractVector{<:Number},
+                          y::AbstractVector{<:Number}, ::GenericInput)
+    for (i, ki) in enumerate(k.args)
+        D[i, i] = DerivativeKernel(ki)(x[i], y[i])
+    end
+    return D
+end
+
+############################## Input Transformations ###########################
+# can be most efficiently represented by factoring out the Jacobian w.r.t. input warping
+function gramian(G::GradientKernel{<:Real, <:Warped},  x::AbstractVector, y::AbstractVector)
+    W = G.k
+    U(x) = BlockFactorization(Diagonal([ForwardDiff.jacobian(W.u, xi) for xi in x]))
+    k = GradientKernel(W.k)
+    LazyMatrixProduct(U(x)', gramian(k, x, y), U(y))
 end
 
 function gramian(G::GradientKernel{<:Real, <:ScaledInputKernel},  x::AbstractVector, y::AbstractVector)
     n, m = length(x), length(y)
-    # U = kronecker(I(n), G.k.U)
-    U = Diagonal(Fill(G.k.U, n))
-    k = GradientKernel(G.k.k)
-    LazyMatrixProduct((U', gramian(k, x, y), U))
+    S = G.k
+    Ux = kronecker(I(n), S.U)
+    Uy = n == m ? Ux : kronecker(I(m), S.U)
+    k = GradientKernel(S.k)
+    LazyMatrixProduct(Ux', gramian(k, x, y), Uy)
 end
 
-# function (G::GradientKernel{<:Real, <:ScaledInputKernel})(x::AbstractVector, y::AbstractVector)
-#     S = G.k
-#     k = S.k
-# end
+function gramian(G::GradientKernel{<:Real, <:Lengthscale}, x::AbstractVector, y::AbstractVector)
+    n, m = length(x), length(y)
+    L = G.k
+    Ux = Diagonal(fill(L.l, d*n)) # IDEA: Fill for lazy uniform array
+    Uy = n == m ? Ux : Diagonal(fill(L.l, d*m))
+    k = GradientKernel(L.k)
+    LazyMatrixProduct(Ux', gramian(k, x, y), Uy)
+end
 
-# function (G::GradientKernel{<:Real, <:ScaledKernel})(x::AbstractVector, y::AbstractVector)
-#
-# end
-# TODO:
-# function (G::GradientKernel{<:Real, <:SeparableProduct})(x::AbstractVector, y::AbstractVector)
-#     return -1
-# end
-# function (G::GradientKernel{<:Real, <:SeparableSum})(x::AbstractVector, y::AbstractVector)
-#     return -1
-# end
-# function (G::GradientKernel{<:Real, <:Normed})(x::AbstractVector, y::AbstractVector)
-#     return -1
-# end
-# function (G::GradientKernel{<:Real, <:Lengthscale})(x::AbstractVector, y::AbstractVector)
-#     return -1
-# end
+############################### VerticalRescaling ##############################
+# gradient element can be expressed with WoodburyIdentity and LazyMatrixProduct
+function allocate_gradient_kernel(k::VerticalRescaling, x, y, ::GenericInput = GenericInput())
+    f, h, d = k.f, k.k, length(x)
+    H = allocate_gradient_kernel(h, x, y, input_trait(h))
+    A = LazyMatrixProduct(Diagonal(fill(f(x), d)), H, Diagonal(fill(f(y), d)))
+    U = zeros(d, 2)
+    V = zeros(d, 2)
+    C = zeros(2, 2)
+    Woodbury(A, U, C, V')
+end
+
+function gradient_kernel!(W::Woodbury, k::VerticalRescaling, x, y, ::GenericInput = GenericInput())
+    f, h, A = k.f, k.k, W.A
+    fx, fy = f(x), f(y)
+    @. A.args[1].diag = fx
+    H = A.args[2] # LazyMatrixProduct: first and third are the diagonal scaling matrices, second is the gradient_kernel_matrix of h
+    @. A.args[3].diag = fy
+    gradient_kernel!(H, h, x, y, input_trait(h))
+    ForwardDiff.gradient!(@view(W.U[:, 1]), f, x)
+    ForwardDiff.gradient!(@view(W.U[:, 2]), z->h(z, y), x)
+    ForwardDiff.gradient!(@view(W.V[1, :]), f, y)
+    ForwardDiff.gradient!(@view(W.V[2, :]), z->h(x, z), y)
+    W.C[1, 1] = h(x, y)
+    W.C[1, 2] = fy
+    W.C[2, 1] = fx
+    return W
+end
+
+############################ Scalar Chain Rule #################################
+# generic implementation of scalar chain rule, does not require input kernel to have a basic input type
+# gradient element can be expressed with WoodburyIdentity and LazyMatrixProduct
+function allocate_gradient_kernel(k::Chained, x, y, ::GenericInput)
+    f, h, d = k.f, k.k, length(x)
+    H = allocate_gradient_kernel(h, x, y, input_trait(h))
+    A = LazyMatrixProduct(Diagonal(fill(f(h(x, y)), d)), H)
+    U = zeros(d, 1)
+    V = zeros(d, 1)
+    C = zeros(1, 1)
+    Woodbury(A, U, C, V')
+end
+
+function gradient_kernel!(W::Woodbury, k::Chained, x, y, ::GenericInput)
+    f, h, A = k.f, k.k, W.A
+    f1, f2 = derivative_laplacian(f, h(x, y))
+    @. A.args[1].diag = f1
+    H = A.args[2] # LazyMatrixProduct: first argument is diagonal scaling, second is the gradient_kernel_matrix of h
+    gradient_kernel!(H, h, x, y, input_trait(h))
+    ForwardDiff.gradient!(@view(W.U[:]), z->h(z, y), x)
+    ForwardDiff.gradient!(@view(W.V[1, :]), z->h(x, z), y)
+    @. W.C = f2
+    return W
+end
 
 ################################################################################
 # [f, ∂f] ∼ GP([μ, ∂μ], dK) # value + gradient kernel
 # IDEA: For efficiency, maybe create ValueGradientKernelElement like in hessian.jl
 # currently, this is an order of magnitude slower than GradientKernel
-struct ValueGradientKernel{T, K} <: MultiKernel{T}
+struct ValueGradientKernel{T, K, IT<:InputTrait} <: MultiKernel{T}
     k::K
+    input_trait::IT
+    function ValueGradientKernel{T, K}(k, it = input_trait(k)) where {T, K}
+        new{T, K, typeof(it)}(k, it)
+    end
 end
 ValueGradientKernel(k::AbstractKernel{T}) where {T} = ValueGradientKernel{T, typeof(k)}(k)
 ValueGradientKernel(k) = ValueGradientKernel{Float64, typeof(k)}(k) # use fieldtype here?
-input_trait(G::ValueGradientKernel) = input_trait(G.k)
+
+input_trait(G::ValueGradientKernel) = G.input_trait
 
 function elsize(G::Gramian{<:AbstractMatrix, <:ValueGradientKernel}, i::Int)
     i ≤ 2 ? length(G.x[1]) + 1 : 1
@@ -187,7 +346,7 @@ function value_gradient_kernel(k, x::AbstractVector, y::AbstractVector, T::Input
     K = BlockFactorization(A, nindices, nindices)
     return value_gradient_kernel!(K, k, x, y, T)
 end
-# TODO: specialize evaluate for IsotropicInput, DotProductInput
+# IDEA: specialize evaluate for IsotropicInput, DotProductInput
 # returns block matrix
 function value_gradient_kernel!(K::BlockFactorization, k, x::AbstractVector, y::AbstractVector, T::InputTrait)
     # value = zero(eltype(x))
@@ -317,6 +476,7 @@ end
 
 ############################# Helpers ##########################################
 # special cases that avoid problems with ForwardDiff.gradient and norm at 0
+# IDEA: could define GradientKernel on euclidean2, dot and take advantage of chain rule
 (k::EQ)(x, y) = exp(-euclidean2(x, y)/2)
 (k::RQ)(x, y) = (1 + euclidean2(x, y) / (2*k.α))^-k.α
 
@@ -348,10 +508,6 @@ function derivative_laplacian(f, x::Real)
     g(x) = ForwardDiff.derivative(f, x)
     value_derivative(g, x)
 end
-# function derivative_laplacian(f, x::Real)
-#     g(x) = ForwardDiff.derivative(f, x)
-#     value_derivative(g, x)
-# end
 
 # WARNING: do not use if nested differentation through value_derivative is happening
 function value_derivative(f, x::Real)
@@ -359,44 +515,3 @@ function value_derivative(f, x::Real)
     r = ForwardDiff.derivative!(r, f, x)
     r.value, r.derivs[1]
 end
-
-# special case or EQ:
-# function (G::GradientKernel{<:Real, <:EQ})(x::AbstractVector, y::AbstractVector)
-#     r = difference(x, y)
-#     d = norm(r)
-#     kr = exp(-d^2/2)
-#     D = Diagonal(Fill(kr, length(x)))
-#     K = Woodbury(D, r, fill(kr, (1, 1)), r', -1)
-#     return K
-# end
-
-# special case or EQ:
-# function (G::GradientValueKernel{<:Real, <:EQ})(x::AbstractVector, y::AbstractVector)
-#     r = difference(x, y)
-#     d = norm(r)
-#     kr = exp(-d^2/2)
-#     n = length(x) + 1
-#     u, v = ones(n), ones(n)
-#     @. u[2:end] = -r
-#     @. v[2:end] = r
-#     # u .*= k2; v .*= k2;
-#     D = Diagonal(fill(kr, n))
-#     D[1] = 0
-#     K = Woodbury(D, u, fill(kr, (1, 1)), v', 1)
-#     return K
-# end
-
-# struct StationaryGradientKernel
-#
-# end
-# multiply for stationary gradient kernel element
-# α*AB + β*C
-# function mul!(C::AbstractVecOrMat, A, x, y, B::AbstractVecOrMat, α::Real, β::Real)
-#     r = difference(x, y)
-#     d = norm(r)
-#     k1, k2 = derivative_laplacian(G.k, d)
-#     @. C = α * k1 * B + β*C
-#     rB = r'B
-#     @. C -= k2 * r * rb
-#     return C
-# end

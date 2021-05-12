@@ -25,22 +25,39 @@ isstationary(P::Power) = isstationary(P.k)
 isisotropic(S::ProductsAndSums) = all(isisotropic, S.args)
 isisotropic(P::Power) = isisotropic(P.k)
 
-isdot(S::ProductsAndSums) = all(isdot, S.args)
+isdot(S::ProductsAndSums) = all(isdot, S.args) # need to special case constant kernel
 isdot(P::Power) = isdot(P.k)
 
 abstract type InputTrait end
 struct GenericInput <: InputTrait end
-struct StationaryInput <: InputTrait end
 struct IsotropicInput <: InputTrait end
 struct DotProductInput <: InputTrait end
+struct StationaryInput <: InputTrait end
 
 input_trait(::T) where T = GenericInput()
 input_trait(::StationaryKernel) = StationaryInput()
 input_trait(::IsotropicKernel) = IsotropicInput()
 input_trait(::Union{Dot, ExponentialDot}) = DotProductInput()
 input_trait(P::Power) = input_trait(P.k)
+# function input_trait(S::ProductsAndSums)
+#     input_trait.(S.args) isa NTuple ? input_trait(S.arg[1]) : GenericInput()
+# end
+# special treatment for constant kernel, since it can function for any input
 function input_trait(S::ProductsAndSums)
-    input_trait.(S.args) isa NTuple ? input_trait(S.arg[1]) : GenericInput()
+    i = findfirst(x->!isa(Constant, x), S.args)
+    if isnothing(i) # all constant kernels
+        return IsotropicInput()
+    else
+        trait = input_trait(S.args[i]) # first non-constant kernel
+        for j in i+1:length(S.args)
+            if k[j] isa Constant
+                continue
+            elseif input_trait(k[j]) != trait # if the non-constant kernels don't have the same input type,
+                return GenericInput() # we default back to GenericInput
+            end
+        end
+        return trait
+    end
 end
 
 # traits (works on type level only)

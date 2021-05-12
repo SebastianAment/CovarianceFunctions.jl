@@ -9,7 +9,7 @@ using LinearAlgebraExtensions: ispsd, difference
 
 ############################# constant kernel ##################################
 # can be used to rescale existing kernels
-# TODO: Allow Matrix valued constant
+# IDEA: Allow Matrix-valued constant
 struct Constant{T} <: IsotropicKernel{T}
     c::T
     function Constant(c, check::Bool = true)
@@ -142,7 +142,7 @@ const SM = SpectralMixture
 # there is something else in the literature with the same name ...
 struct Cauchy{T} <: IsotropicKernel{T} end
 Cauchy() = Cauchy{Float64}()
-(k::Cauchy)(r::Number) =  1/(π * (1+r^2))
+(k::Cauchy)(r::Number) =  inv(1+r^2) # π is not necessary, we are not normalizing
 
 # for spectroscopy
 PseudoVoigt(α::T) where T<:Real = α*EQ{T}() + (1-α)*Cauchy{T}()
