@@ -18,7 +18,7 @@ const ProductsAndSums{T, AT} = Union{Sum{T, AT}, Product{T, AT},
                                 SeparableProduct{T, AT}, SeparableSum{T, AT}}
 ismercer(S::ProductsAndSums) = all(ismercer, S.args)
 ismercer(P::Power) = ismercer(P.k)
-
+# TODO: this needs special treatement for constant kernels, which can be all input types
 isstationary(S::ProductsAndSums) = all(isstationary, S.args)
 isstationary(P::Power) = isstationary(P.k)
 
@@ -39,20 +39,19 @@ input_trait(::StationaryKernel) = StationaryInput()
 input_trait(::IsotropicKernel) = IsotropicInput()
 input_trait(::Union{Dot, ExponentialDot}) = DotProductInput()
 input_trait(P::Power) = input_trait(P.k)
-# function input_trait(S::ProductsAndSums)
-#     input_trait.(S.args) isa NTuple ? input_trait(S.arg[1]) : GenericInput()
-# end
+
 # special treatment for constant kernel, since it can function for any input
 function input_trait(S::ProductsAndSums)
-    i = findfirst(x->!isa(Constant, x), S.args)
+    i = findfirst(x->!isa(x, Constant), S.args)
     if isnothing(i) # all constant kernels
         return IsotropicInput()
     else
         trait = input_trait(S.args[i]) # first non-constant kernel
         for j in i+1:length(S.args)
-            if k[j] isa Constant
+            k = S.args[j]
+            if k isa Constant
                 continue
-            elseif input_trait(k[j]) != trait # if the non-constant kernels don't have the same input type,
+            elseif input_trait(k) != trait # if the non-constant kernels don't have the same input type,
                 return GenericInput() # we default back to GenericInput
             end
         end

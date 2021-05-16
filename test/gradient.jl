@@ -124,4 +124,17 @@ const AbstractMatOrFac = Union{AbstractMatrix, Factorization}
     end
 end
 
+@testset "gradient algebra" begin
+    # sum
+    k = CovarianceFunctions.EQ()
+    h = CovarianceFunctions.Dot()
+    gk, gh = GradientKernel(k), GradientKernel(h)
+    G = GradientKernel(k + h)
+    d, n = 2, 3
+    X = randn(d, n)
+    K = gramian(G, X)
+    MK = Matrix(K)
+    @test MK ≈ Matrix(gramian(gk, X)) + Matrix(gramian(gh, X))
+end
+
 end

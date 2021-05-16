@@ -5,6 +5,7 @@ properties
 gramian
 sm
 gradient
+gradient_algebra
 hessian
 separable
 parameters

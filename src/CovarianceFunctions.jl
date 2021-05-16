@@ -2,6 +2,7 @@ module CovarianceFunctions
 
 export AbstractKernel, MercerKernel, StationaryKernel, IsotropicKernel, MulitKernel
 export gramian, Gramian
+export DotProductInput, IsotropicInput, GenericInput, InputTrait, input_trait
 
 using LinearAlgebra
 using SparseArrays
@@ -50,6 +51,7 @@ include("gramian.jl") # deprecate in favor of kernel matrix?
 
 # including multi-output kernels
 include("gradient.jl")
+include("gradient_algebra.jl")
 include("hessian.jl")
 include("separable.jl")
 
