@@ -4,6 +4,7 @@ using Test
 using LinearAlgebra
 using ToeplitzMatrices
 using CovarianceFunctions: gramian, Gramian
+using LazyLinearAlgebra: BlockFactorization
 
 @testset "Gramian properties" begin
     n = 8
@@ -42,6 +43,10 @@ using CovarianceFunctions: gramian, Gramian
     @test typeof(k(x[1], x[1])) <: eltype(G)
 
     # TODO: MultiKernel test
+    k = (x, y) -> randn(3, 2)
+    G = gramian(k, x)
+    @test G isa BlockFactorization # testing that matrix-valued kernel returns block factorization
+    @test size(G) == (3n, 2n)
 end
 
 @testset "Gramian factorization" begin

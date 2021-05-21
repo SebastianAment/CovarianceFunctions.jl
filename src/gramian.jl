@@ -68,7 +68,11 @@ end
 
 ######################### smart pseudo-constructor #############################
 # standard approach is a lazily represented kernel matrix
-gramian(k, x::AbstractVector, y::AbstractVector) = Gramian(k, x, y)
+# by default, Gramians of matrix-valued kernels are BlockFactorizations
+function gramian(k, x::AbstractVector, y::AbstractVector)
+    G = Gramian(k, x, y)
+    eltype(G) <: AbstractMatOrFac ? LazyLinearAlgebra.BlockFactorization(G) : G
+end
 gramian(k, x) = gramian(k, x, x)
 
 gramian(x::AbstractVector, y::AbstractVector) = Gramian(x, y)
