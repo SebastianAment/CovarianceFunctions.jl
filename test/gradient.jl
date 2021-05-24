@@ -71,7 +71,7 @@ const AbstractMatOrFac = Union{AbstractMatrix, Factorization}
             @test maximum(abs, MK - MK') < ε
             MK = Symmetric(MK)
             if !all(≥(-1e-10), eigvals(MK))
-                println("eigensnafoo")
+                println("eigen-snafoo")
                 display(eigvals(MK))
             end
             @test all(≥(-1e-10), eigvals(MK)) # positive semidefinite

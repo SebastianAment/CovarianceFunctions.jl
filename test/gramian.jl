@@ -70,6 +70,15 @@ end
     F = cholesky(G, Val(false))
     @test F isa Cholesky
     @test isapprox(Matrix(F), G, atol = 1e-8)
+
+    # testing gramian of matrix-valued anonymous kernel
+    A = randn(3, 2)
+    k = (x, y)->A
+    G = gramian(k, x)
+    GA = Matrix(G)
+    a = randn(2*n)
+    @test G isa BlockFactorization
+    @test G*a ≈ GA*a
 end
 
 @testset "toeplitz structure" begin

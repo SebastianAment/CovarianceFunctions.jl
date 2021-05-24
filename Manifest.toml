@@ -213,7 +213,7 @@ version = "0.1.0"
 
 [[LazyLinearAlgebra]]
 deps = ["DataStructures", "LinearAlgebra", "Test"]
-git-tree-sha1 = "c258233b1ef40e86a2780ef638074d7dfdd59b4d"
+git-tree-sha1 = "a8a0b0baa148328ee5a4cfce07171f94f9040754"
 repo-rev = "master"
 repo-url = "git@github.com:SebastianAment/LazyLinearAlgebra.jl.git"
 uuid = "2243f6fe-7ec1-4b08-8ffc-03329353bf89"
@@ -319,9 +319,9 @@ uuid = "ca575930-c2e3-43a9-ace4-1e988b2c1908"
 
 [[OffsetArrays]]
 deps = ["Adapt"]
-git-tree-sha1 = "47b443d2ccc8297a4c538f55f8fd828ad58599ab"
+git-tree-sha1 = "c3a3d8d45fb533e88e3ab97748d40ee85711d988"
 uuid = "6fe1bfb0-de20-5000-8ca7-80f57d26f881"
-version = "1.8.0"
+version = "1.9.0"
 
 [[OpenSpecFun_jll]]
 deps = ["Artifacts", "CompilerSupportLibraries_jll", "JLLWrappers", "Libdl", "Pkg"]

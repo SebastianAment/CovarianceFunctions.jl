@@ -49,7 +49,7 @@ end
 # need this for blockmul! to work in BlockFactorization
 # specialization for Gramians of matrix-valued kernels
 # IDEA: precompute input_trait?
-function LazyLinearAlgebra.evaluate_block!(Gij, G::Gramian{<:AbstractMatOrFac}, i::Int, j::Int)
+function LazyLinearAlgebra.evaluate_block!(Gij, G::Gramian{<:Any, <:MultiKernel}, i::Int, j::Int)
     evaluate_block!(Gij, G.k, G.x[i], G.y[j], input_trait(G.k))
 end
 
