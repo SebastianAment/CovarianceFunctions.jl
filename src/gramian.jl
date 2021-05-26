@@ -42,8 +42,31 @@ end
 # IDEA: GPU
 using LinearAlgebra: checksquare
 using Base.Threads
-function Base.:*(G::Gramian{<:AbstractMatOrFac{<:Real}}, x::AbstractVecOfVec{<:Real})
+# probably no necessary anymore, with BlockFactorization
+function Base.:*(G::Gramian{<:AbstractMatOrFac{<:Real}}, x::AbstractVecOfVec{<:Number})
     mul!(deepcopy(x), G, x)
+end
+# make generic multiply multi-threaded and SIMD-enabled
+function LinearAlgebra.mul!(y::AbstractVector, G::Gramian, x::AbstractVector, α::Real = 1, β::Real = 0)
+    n, m = size(G)
+    y .*= β
+    @threads for i in 1:n
+        @simd for j in 1:m
+            @inbounds y[i] += α * G[i, j] * x[j]
+        end
+    end
+    return y
+end
+# parallel matrix instantiation
+function Base.Matrix(G::Gramian)
+    n, m = size(G)
+    M = zeros(eltype(G), n, m)
+    @threads for i in 1:n
+        for j in 1:m
+            M[i, j] = G[i, j]
+        end
+    end
+    return M
 end
 
 # need this for blockmul! to work in BlockFactorization
@@ -69,6 +92,8 @@ end
 ######################### smart pseudo-constructor #############################
 # standard approach is a lazily represented kernel matrix
 # by default, Gramians of matrix-valued kernels are BlockFactorizations
+# TODO: don't return BlockFactorization if one dimension is one!
+# elsize(G)[1]  == 1 && size(G)[1] == 1
 function gramian(k, x::AbstractVector, y::AbstractVector)
     G = Gramian(k, x, y)
     eltype(G) <: AbstractMatOrFac ? LazyLinearAlgebra.BlockFactorization(G) : G

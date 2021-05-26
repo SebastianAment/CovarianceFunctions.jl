@@ -409,15 +409,15 @@ uuid = "2f01184e-e22b-5df5-ae63-d93ebab69eaf"
 
 [[SpecialFunctions]]
 deps = ["ChainRulesCore", "LogExpFunctions", "OpenSpecFun_jll"]
-git-tree-sha1 = "c467f25b6ec4167ea3a9a4351c66c2e1cba5da33"
+git-tree-sha1 = "371204984184315ed7228bcc604d08e1bbc18f31"
 uuid = "276daf66-3868-5448-9aa4-cd146d93841b"
-version = "1.4.1"
+version = "1.4.2"
 
 [[StaticArrays]]
 deps = ["LinearAlgebra", "Random", "Statistics"]
-git-tree-sha1 = "c635017268fd51ed944ec429bcc4ad010bcea900"
+git-tree-sha1 = "a1f226ebe197578c25fcf948bfff3d0d12f2ff20"
 uuid = "90137ffa-7385-5640-81b9-e52037218182"
-version = "1.2.0"
+version = "1.2.1"
 
 [[Statistics]]
 deps = ["LinearAlgebra", "SparseArrays"]
@@ -473,7 +473,7 @@ uuid = "4ec0a83e-493e-50e2-b9ac-8f72acf5a8f5"
 
 [[WoodburyIdentity]]
 deps = ["BenchmarkTools", "LazyInverse", "LinearAlgebra", "LinearAlgebraExtensions", "Test"]
-git-tree-sha1 = "b0350fce453c7cc4b6ff4dd89dd52dacf16184fd"
+git-tree-sha1 = "c7eb3f04d3f99972b96710260f19403acb642b78"
 repo-rev = "master"
 repo-url = "git@github.com:SebastianAment/WoodburyIdentity.jl.git"
 uuid = "49563772-d9e4-48b4-a8b6-4cbe661ead9f"
