@@ -47,7 +47,8 @@ function Base.:*(G::Gramian{<:AbstractMatOrFac{<:Real}}, x::AbstractVecOfVec{<:N
     mul!(deepcopy(x), G, x)
 end
 # make generic multiply multi-threaded and SIMD-enabled
-Base.:*(G::Gramian, x::AbstractVecOrMat) = mul!(zero(x), G, x)
+Base.:*(G::Gramian, x::AbstractVector) = mul!(zero(x), G, x)
+Base.:*(G::Gramian, x::AbstractMatrix) = mul!(zero(x), G, x)
 function LinearAlgebra.mul!(y::AbstractVector, G::Gramian, x::AbstractVector, α::Real = 1, β::Real = 0)
     n, m = size(G)
     y .*= β
