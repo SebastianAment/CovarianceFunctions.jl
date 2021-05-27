@@ -86,6 +86,7 @@ end
 ScaledInputKernel(k, U) = ScaledInputKernel{Float64}(k, U)
 ScaledInputKernel{T}(k, U) where T = ScaledInputKernel{T, typeof(k), typeof(U)}(k, U)
 (S::ScaledInputKernel)(x, y) = S.k(S.U*x, S.U*y)
+(S::ScaledInputKernel)(r) = S.k(S.U*r) # for stationary kernels
 
 # if U has quadratic complexity in d, this reduces from O(n^2d^2) to O(nd^2 + n^2d)
 # currently, this acceleration is currently only used if S.U is square and not diagonal
