@@ -42,6 +42,25 @@ using LazyLinearAlgebra: BlockFactorization
     @test typeof(k(x[1], x[1])) <: typeof(G[1,1])  # with tuples (or arrays)
     @test typeof(k(x[1], x[1])) <: eltype(G)
 
+    # rectangular multiply
+    y = randn(2n)
+    G = gramian(k, x, y)
+    @test size(G) == (n, 2n)
+    a = randn(2n)
+    b = G*a
+    @test length(b) == n
+    @test b ≈ Matrix(G) * a
+
+    y = randn(2n)
+    G = gramian(k, x, y)
+    @test size(G) == (n, 2n)
+    p = 3
+    A = randn(2n, p)
+    B = G*A
+    @test size(B) == (n, p)
+    @test B ≈ Matrix(G) * A
+
+
     # TODO: MultiKernel test
     k = (x, y) -> randn(3, 2)
     G = gramian(k, x)
