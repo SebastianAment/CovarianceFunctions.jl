@@ -62,7 +62,7 @@ end
 # parallel matrix instantiation
 function Base.Matrix(G::Gramian)
     n, m = size(G)
-    M = zeros(eltype(G), n, m)
+    M = Matrix{eltype(G)}(undef, n, m)
     @threads for i in 1:n
         for j in 1:m
             M[i, j] = G[i, j]
@@ -90,6 +90,11 @@ LinearAlgebra.ishermitian(G::Gramian) = issymmetric(G)
 function LinearAlgebra.isposdef(G::Gramian)
     return typeof(G.k) <: Union{MercerKernel, MultiKernel} && issymmetric(G)
 end
+
+# struct KernelMatrix end
+# function kernel_matrix(k, x)
+#     factorize()
+# end
 
 ######################### smart pseudo-constructor #############################
 # standard approach is a lazily represented kernel matrix
