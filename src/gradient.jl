@@ -35,7 +35,8 @@ end
 
 # allocates space for gradient kernel evaluation but does not evaluate
 # separation from evaluation useful for ValueGradientKernel
-allocate_gradient_kernel(k, x, y, ::GenericInput) = zeros(length(x), length(x))
+# x and y should have same length, i.e. dimensionality
+allocate_gradient_kernel(k, x, y, ::GenericInput) = zeros(length(x), length(y))
 
 function gradient_kernel!(K::AbstractMatrix, k, x::AbstractVector, y::AbstractVector, ::GenericInput)
     value = similar(x)
@@ -312,7 +313,7 @@ _derivative_helper(k) = throw("_derivative_helper not defined for kernel of type
 _derivative_helper(k::EQ) = f(r²) = exp(-r²/2)
 _derivative_helper(k::RQ) = f(r²) = inv(1 + r² / (2*k.α))^k.α
 _derivative_helper(k::Constant) = f(r²) = k.c
-_derivative_helper(k::Dot) = f(r²) = r²
+_derivative_helper(k::Dot) = f(r²) = r² # r² = dot(x, y) in the case of dot product kernels
 _derivative_helper(k::ExponentialDot) = f(r²) = exp(r²)
 _derivative_helper(k::Power) = f(r²) = _derivative_helper(k.k)(r²)^k.p
 function _derivative_helper(k::Sum)

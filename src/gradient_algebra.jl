@@ -1,7 +1,7 @@
 ############################ Gradient Algebra ##################################
 ################################# Sum ##########################################
 # allocates space for gradient kernel evaluation but does not evaluate
-# separation from evaluation useful for ValueGradientKernel
+# the separation from evaluation is useful for ValueGradientKernel
 function allocate_gradient_kernel(k::Sum, x, y, ::GenericInput)
     H = (allocate_gradient_kernel(h, x, y, input_trait(h)) for h in k.args)
     LazyMatrixSum(H...)
