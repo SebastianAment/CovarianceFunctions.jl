@@ -108,14 +108,15 @@ function gramian(G::GradientKernel{<:Real, <:ScaledInputKernel},  x::AbstractVec
     LazyMatrixProduct(Ux', gramian(k, x, y), Uy)
 end
 
-function gramian(G::GradientKernel{<:Real, <:Lengthscale}, x::AbstractVector, y::AbstractVector)
-    n, m = length(x), length(y)
-    L = G.k
-    Ux = Diagonal(fill(L.l, d*n)) # IDEA: Fill for lazy uniform array
-    Uy = n == m ? Ux : Diagonal(fill(L.l, d*m))
-    k = GradientKernel(L.k)
-    LazyMatrixProduct(Ux', gramian(k, x, y), Uy)
-end
+# I don't think this needs a special case, since we can take care of it in 
+# function gramian(G::GradientKernel{<:Real, <:Lengthscale}, x::AbstractVector, y::AbstractVector)
+#     n, m = length(x), length(y)
+#     L = G.k
+#     Ux = Diagonal(fill(L.l, d*n)) # IDEA: Fill for lazy uniform array
+#     Uy = n == m ? Ux : Diagonal(fill(L.l, d*m))
+#     k = GradientKernel(L.k)
+#     LazyMatrixProduct(Ux', gramian(k, x, y), Uy)
+# end
 
 ############################### VerticalRescaling ##############################
 # gradient element can be expressed with WoodburyIdentity and LazyMatrixProduct

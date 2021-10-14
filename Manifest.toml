@@ -113,10 +113,10 @@ uuid = "1a297f60-69ca-5386-bcde-b61e274b549b"
 version = "0.12.7"
 
 [[ForwardDiff]]
-deps = ["CommonSubexpressions", "DiffResults", "DiffRules", "LinearAlgebra", "NaNMath", "Printf", "Random", "SpecialFunctions", "StaticArrays"]
-git-tree-sha1 = "c4203b60d37059462af370c4f3108fb5d155ff13"
+deps = ["CommonSubexpressions", "DiffResults", "DiffRules", "LinearAlgebra", "NaNMath", "Preferences", "Printf", "Random", "SpecialFunctions", "StaticArrays"]
+git-tree-sha1 = "63777916efbcb0ab6173d09a658fb7f2783de485"
 uuid = "f6369f11-7733-5829-9624-2563aa707210"
-version = "0.10.20"
+version = "0.10.21"
 
 [[InfiniteArrays]]
 deps = ["ArrayLayouts", "FillArrays", "Infinities", "LazyArrays", "LinearAlgebra", "Statistics"]
@@ -183,8 +183,8 @@ uuid = "d0afe1cb-6484-4949-b9e9-61bc645ed6c7"
 version = "0.1.0"
 
 [[LazyLinearAlgebra]]
-deps = ["DataStructures", "LinearAlgebra", "Test"]
-git-tree-sha1 = "df8e699c35833681392d6ace21d8e70f94a1c22c"
+deps = ["DataStructures", "LazyInverse", "LinearAlgebra", "LinearAlgebraExtensions", "Test", "WoodburyIdentity"]
+git-tree-sha1 = "3048d9e5ed27a3e97b4c09bf96ee783fe618d81e"
 repo-rev = "master"
 repo-url = "git@github.com:SebastianAment/LazyLinearAlgebra.jl.git"
 uuid = "2243f6fe-7ec1-4b08-8ffc-03329353bf89"
@@ -215,7 +215,7 @@ uuid = "37e2e46d-f89d-539d-b4ee-838fcccc9c8e"
 
 [[LinearAlgebraExtensions]]
 deps = ["FFTW", "InfiniteArrays", "LazyArrays", "LazyInverse", "LinearAlgebra", "StatsBase", "Test"]
-git-tree-sha1 = "26fdc03868b132d9e8aefdc8aa2b3a8d70df0b58"
+git-tree-sha1 = "f5ebc8314cb196ace92c681a29c88ffff6de648f"
 repo-rev = "master"
 repo-url = "https://github.com/SebastianAment/LinearAlgebraExtensions.jl.git"
 uuid = "cb114d4a-f1bd-499c-ad9e-7f2ed74575b9"
@@ -293,9 +293,9 @@ version = "1.4.1"
 
 [[Parsers]]
 deps = ["Dates"]
-git-tree-sha1 = "a8709b968a1ea6abc2dc1967cb1db6ac9a00dfb6"
+git-tree-sha1 = "98f59ff3639b3d9485a03a72f3ab35bab9465720"
 uuid = "69de0a69-1ddd-5017-9359-2bf0b02dc9f0"
-version = "2.0.5"
+version = "2.0.6"
 
 [[Pkg]]
 deps = ["Artifacts", "Dates", "Downloads", "LibGit2", "Libdl", "Logging", "Markdown", "Printf", "REPL", "Random", "SHA", "Serialization", "TOML", "Tar", "UUIDs", "p7zip_jll"]

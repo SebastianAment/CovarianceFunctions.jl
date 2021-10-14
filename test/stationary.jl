@@ -10,16 +10,20 @@ using CovarianceFunctions: MercerKernel, StationaryKernel, isstationary, isisotr
 using CovarianceFunctions: iscov, enorm, Normed
 using ForwardDiff: derivative
 
-const k_strings = ["Exponentiated Quadratic", "Exponential", "δ",
+# isotropic kernels
+const iso_k_strings = ["Exponentiated Quadratic", "Exponential", "δ",
             "Constant", "Rational Quadratic",
-            "γ-Exponential", "Cosine",
-            "Matern"]#, "Spectral Mixture"]
+            "γ-Exponential", "Matern"]
+# all stationary kernels
+const k_strings = vcat(iso_k_strings, "Cosine")
+                #, "Spectral Mixture"]
 
 r = 2*rand()
-const k_arr = [EQ(), Exp(), Delta(),
+const iso_k_arr = [EQ(), Exp(), Delta(),
         Constant(r), RQ(r),
-        γExp(r), Cosine(r),
-        Matern(r)]#, SM]
+        γExp(r), Matern(r)]
+const k_arr = vcat(iso_k_arr, Cosine(r))
+        #, SM]
 
 const tol = 1e-12
 
@@ -88,7 +92,7 @@ end
     l = exp(randn())
     for d = 1:3
         r = randn(d)
-        for (k, k_str) in zip(k_arr, k_strings)
+        for (k, k_str) in zip(iso_k_arr, iso_k_strings)
             kl = Lengthscale(k, l)
             @test kl(r) ≈ k(norm(r)/l)
             # @test typeof(kl) <: CovarianceFunctions.IsotropicKernel

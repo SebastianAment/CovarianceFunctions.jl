@@ -1,7 +1,7 @@
 module TestGradient
 using Test
 using CovarianceFunctions
-using CovarianceFunctions: EQ, RQ, Dot, ExponentialDot, NN
+using CovarianceFunctions: EQ, RQ, Dot, ExponentialDot, NN, Lengthscale
 using CovarianceFunctions: GradientKernel, ValueGradientKernel,
                            DerivativeKernel, ValueDerivativeKernel,
                            input_trait, BlockFactorization
@@ -12,10 +12,13 @@ const AbstractMatOrFac = Union{AbstractMatrix, Factorization}
     # nd test
     n = 32
     d = 16
+    # n = 2
+    # d = 2
     X = randn(d, n) / sqrt(d)
     ε = 1e4eps()
     @testset "GradientKernel" begin
         kernels = [EQ(), RQ(1.), Dot()^3, ExponentialDot(), NN()]
+        # kernels = [EQ(), Lengthscale(EQ(), 0.1)] # at this time, test doesn't work because fallback is incorrect
         a = randn(d*n)
         b = randn(d*n)
         for k in kernels
@@ -54,7 +57,7 @@ const AbstractMatOrFac = Union{AbstractMatrix, Factorization}
             a = randn(n*d)
             Ka = K*a
             as = K\Ka
-            @test norm(K*as-Ka) < 1e-6
+            @test norm(K*as-Ka) / norm(Ka) < 1e-6
         end
     end
 
@@ -102,7 +105,7 @@ const AbstractMatOrFac = Union{AbstractMatrix, Factorization}
             a = randn(n*(d+1))
             Ka = K*a
             as = K\Ka
-            @test norm(K*as-Ka) < 1e-6
+            @test norm(K*as-Ka) / norm(Ka) < 1e-6
         end
     end
     # matrix multiply

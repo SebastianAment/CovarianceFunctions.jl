@@ -306,6 +306,7 @@ end
 # IDEA: could define GradientKernel on euclidean2, dot and take advantage of chain rule
 (k::EQ)(x, y) = exp(-euclidean2(x, y)/2)
 (k::RQ)(x, y) = (1 + euclidean2(x, y) / (2*k.α))^-k.α
+# (k::Lengthscale)(x, y) = k.k(euclidean2(x, y)/2)
 
 # derivative helper returns the function f such that f(r²) = k(x, y) where r² = sum(abs2, x-y)
 # this is required for the efficient computation of the gradient kernel matrices
@@ -316,6 +317,10 @@ _derivative_helper(k::Constant) = f(r²) = k.c
 _derivative_helper(k::Dot) = f(r²) = r² # r² = dot(x, y) in the case of dot product kernels
 _derivative_helper(k::ExponentialDot) = f(r²) = exp(r²)
 _derivative_helper(k::Power) = f(r²) = _derivative_helper(k.k)(r²)^k.p
+function _derivative_helper(k::Lengthscale)
+    f(r²) = _derivative_helper(k.k)(r²/k.l^2)
+end
+
 function _derivative_helper(k::Sum)
     summands = _derivative_helper.(k.args)
     f(r²) = sum(h->h(r²), summands)

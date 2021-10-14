@@ -3,10 +3,10 @@
 # IDEA: using meta-programming, could write constructors:
 # EQ(l::Float) = Lengthscale(EQ(), l)
 # for all isotropic kernels?
-struct Lengthscale{T, K} <: StationaryKernel{T}
+struct Lengthscale{T, K} <: IsotropicKernel{T}
     k::K
     l::T
-    function Lengthscale(k::StationaryKernel, l::Real)
+    function Lengthscale(k::IsotropicKernel, l::Real)
         0 > l && throw(DomainError("l = $l is non-positive"))
         S = promote_type(eltype(k), typeof(l))
         l = convert(S, l)
@@ -14,8 +14,6 @@ struct Lengthscale{T, K} <: StationaryKernel{T}
     end
 end
 (k::Lengthscale)(τ::Number) = k.k(τ/k.l)
-isisotropic(k::Lengthscale) = isisotropic(k.k)
-isstationary(k::Lengthscale) = isstationary(k.k)
 
 parameters(k::Lengthscale) = vcat(parameters(k.k), k.l)
 nparameters(k::Lengthscale) = nparameters(k.k) + 1

@@ -30,6 +30,8 @@ abstract type MercerKernel{T} <: AbstractKernel{T} end
 abstract type StationaryKernel{T} <: MercerKernel{T} end
 abstract type IsotropicKernel{T} <: StationaryKernel{T} end # ίσος + τρόπος (equal + way)
 
+# TODO: rewrite stationary kernels as function of r² to avoid AD problems
+
 # class of matrix-valued kernels for multi-output GPs
 abstract type MultiKernel{T} <: AbstractKernel{T} end # MultiKernel
 # compute the (i, j)th entry of k(x, y)
