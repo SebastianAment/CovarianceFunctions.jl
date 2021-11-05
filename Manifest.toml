@@ -29,9 +29,9 @@ version = "1.2.0"
 
 [[ChainRulesCore]]
 deps = ["Compat", "LinearAlgebra", "SparseArrays"]
-git-tree-sha1 = "74e8234fb738c45e2af55fdbcd9bfbe00c2446fa"
+git-tree-sha1 = "8d954297bc51cc64f15937c2093799c3617b73e4"
 uuid = "d360d2e6-b24c-11e9-a2a3-2a2ae2dbcce4"
-version = "1.8.0"
+version = "1.10.0"
 
 [[CommonSubexpressions]]
 deps = ["MacroTools", "Test"]
@@ -215,7 +215,7 @@ uuid = "37e2e46d-f89d-539d-b4ee-838fcccc9c8e"
 
 [[LinearAlgebraExtensions]]
 deps = ["FFTW", "InfiniteArrays", "LazyArrays", "LazyInverse", "LinearAlgebra", "StatsBase", "Test"]
-git-tree-sha1 = "f5ebc8314cb196ace92c681a29c88ffff6de648f"
+git-tree-sha1 = "2d022a1e899dfcd9d3101c8a3a92ecf4677909ce"
 repo-rev = "master"
 repo-url = "https://github.com/SebastianAment/LinearAlgebraExtensions.jl.git"
 uuid = "cb114d4a-f1bd-499c-ad9e-7f2ed74575b9"
@@ -380,9 +380,9 @@ version = "1.0.0"
 
 [[StatsBase]]
 deps = ["DataAPI", "DataStructures", "LinearAlgebra", "LogExpFunctions", "Missings", "Printf", "Random", "SortingAlgorithms", "SparseArrays", "Statistics", "StatsAPI"]
-git-tree-sha1 = "65fb73045d0e9aaa39ea9a29a5e7506d9ef6511f"
+git-tree-sha1 = "eb35dcc66558b2dda84079b9a1be17557d32091a"
 uuid = "2913bbd2-ae8a-5f71-8c99-4fb6c76f3a91"
-version = "0.33.11"
+version = "0.33.12"
 
 [[TOML]]
 deps = ["Dates"]
