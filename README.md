@@ -1,3 +1,7 @@
+# CovarianceFunctions.jl 
+[![CI](https://github.com/SebastianAment/CovarianceFunctions.jl/actions/workflows/CI.yml/badge.svg)](https://github.com/SebastianAment/CovarianceFunctions.jl/actions/workflows/CI.yml)
+[![codecov](https://codecov.io/gh/SebastianAment/CovarianceFunctions.jl/branch/master/graph/badge.svg?token=04NSNJC9H1)](https://codecov.io/gh/SebastianAment/CovarianceFunctions.jl)
+
 This package implements many popularly used Mercer kernels.
 Commonly used abstract types are
 `IsotropicKernel <: StationaryKernel <: MercerKernel`.
