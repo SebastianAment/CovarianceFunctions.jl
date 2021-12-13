@@ -1,13 +1,13 @@
 module TestGradientAlgebra
 using Test
-using CovarianceFunctions
-using CovarianceFunctions: EQ, RQ, Dot, ExponentialDot, NN
-using CovarianceFunctions: GradientKernel, ValueGradientKernel,
-                           DerivativeKernel, ValueDerivativeKernel,
-                           input_trait, BlockFactorization
-using WoodburyIdentity
 using LinearAlgebra
-using LazyLinearAlgebra
+using WoodburyFactorizations
+using BlockFactorizations
+using CovarianceFunctions
+using CovarianceFunctions: EQ, RQ, Dot, ExponentialDot, NN, GradientKernel,
+        ValueGradientKernel, DerivativeKernel, ValueDerivativeKernel, input_trait,
+        LazyMatrixSum
+
 const AbstractMatOrFac = Union{AbstractMatrix, Factorization}
 
 @testset "input trait property" begin

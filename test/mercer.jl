@@ -21,14 +21,13 @@ using LinearAlgebra
 end
 
 @testset "mercer" begin
-    using CovarianceFunctions: FiniteBasis, gramian, Gramian
-    using LinearAlgebraExtensions: LowRank
+    using CovarianceFunctions: FiniteBasis, gramian, Gramian, LazyMatrixProduct
 
     basis = [sin, cos, identity]
     k = FiniteBasis(basis)
     @test k isa FiniteBasis
     x = randn(16)
-    @test gramian(k, x) isa LowRank
+    @test gramian(k, x) isa LazyMatrixProduct
     U = [sin.(x) cos.(x) x]
     @test Matrix(gramian(k, x)) ≈ U*U'
 

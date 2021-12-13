@@ -33,6 +33,7 @@ struct GenericInput <: InputTrait end
 struct IsotropicInput <: InputTrait end
 struct DotProductInput <: InputTrait end
 struct StationaryInput <: InputTrait end
+struct PeriodicInput <: InputTrait end
 
 input_trait(::T) where T = GenericInput()
 input_trait(::StationaryKernel) = StationaryInput()

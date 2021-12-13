@@ -1,10 +1,12 @@
 module TestGramian
+
 using CovarianceFunctions
 using Test
 using LinearAlgebra
 using ToeplitzMatrices
-using CovarianceFunctions: gramian, Gramian
-using LazyLinearAlgebra: BlockFactorization
+using CovarianceFunctions
+using CovarianceFunctions: PeriodicInput
+using BlockFactorizations
 
 @testset "Gramian properties" begin
     n = 8
@@ -69,26 +71,26 @@ using LazyLinearAlgebra: BlockFactorization
 end
 
 @testset "Gramian factorization" begin
+    atol = 1e-8
     k = CovarianceFunctions.EQ()
     n = 64
     x = randn(n)
     G = gramian(k, x)
     F = factorize(G)
     @test F isa CholeskyPivoted
-    @test issuccess(F)
     @test rank(F) < n ÷ 2 # this should be very low rank
-    @test isapprox(Matrix(F), G, atol = 1e-8)
+    @test isapprox(Matrix(F), G, atol = atol)
 
     F = cholesky(G)
     @test F isa CholeskyPivoted
-    @test isapprox(Matrix(F), G, atol = 1e-8)
+    @test isapprox(Matrix(F), G, atol = atol)
 
     # regular cholesky
     k = CovarianceFunctions.Exponential() # does not yield low rank matrix
     G = gramian(k, x)
     F = cholesky(G, Val(false))
     @test F isa Cholesky
-    @test isapprox(Matrix(F), G, atol = 1e-8)
+    @test isapprox(Matrix(F), G, atol = atol)
 
     # testing gramian of matrix-valued anonymous kernel
     A = randn(3, 2)
@@ -101,13 +103,17 @@ end
 end
 
 @testset "toeplitz structure" begin
-    n = 16
-    x = -1:.1:1
+    n = 32
+    x = range(-1, 1, n)
     k = CovarianceFunctions.EQ()
-    m = gramian(k, x)
-    # @test typeof(m) <: SymmetricToeplitz
-    m = gramian(k, x, Val(true)) # periodic boundary conditions
-    @test m isa Circulant
-end
+    G = gramian(k, x)
+    @test G isa SymmetricToeplitz
+    @test size(G) == (n, n)
+    @test Matrix(G) ≈ Matrix(Gramian(k, x))
+    G = gramian(k, x, PeriodicInput()) # periodic boundary conditions
+    @test G isa Circulant
+    @test size(G) == (n, n)
+    # @test Matrix(G) ≈ Matrix(Gramian(k, x))
+end # TODO: test solves and multiplications
 
 end # TestGramian

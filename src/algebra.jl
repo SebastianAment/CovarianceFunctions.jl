@@ -71,7 +71,6 @@ function Base.similar(k::Power, θ::AbstractVector)
 end
 
 ############################ Separable Product #################################
-using LinearAlgebraExtensions: LazyGrid, grid
 # product kernel, but separately evaluates component kernels on different parts of the input
 struct SeparableProduct{T, K<:Tuple{Vararg{AbstractKernel}}} <: AbstractKernel{T}
     args::K # kernel for input covariances
@@ -97,6 +96,7 @@ function (K::SeparableProduct)(x::AbstractVector, y::AbstractVector)
     end
     return val
 end
+
 # if we had kernel input type, could compare with eltype(X)
 function gramian(K::SeparableProduct, X::LazyGrid, Y::LazyGrid)
     kronecker((gramian(kxy...) for kxy in zip(K.args, X.args, Y.args))...)
@@ -104,8 +104,8 @@ end
 function gramian(K::SeparableProduct, X::LazyGrid)
     kronecker((gramian(kx...) for kx in zip(K.args, X.args))...)
 end
-# TODO: if points are not on a grid, can still evaluate dimensions separately,
-# and take elementwise product. Might lead to efficiency gains
+# IDEA: if points are not on a grid, can still evaluate dimensions separately,
+# and take elementwise product. Might lead to efficiency gains?
 ############################### Separable Sum ##################################
 # what about separable sums? do they give rise to kronecker sums? yes!
 struct SeparableSum{T, K<:Tuple{Vararg{AbstractKernel}}} <: AbstractKernel{T}

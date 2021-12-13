@@ -51,13 +51,13 @@ function basis(k::FiniteBasis, x::AbstractVector)
     end
     U
 end
-using LinearAlgebraExtensions: LowRank
+
 function gramian(k::FiniteBasis, x::AbstractVector, y::AbstractVector)
     r = length(k.basis)
     if length(x) > r && length(y) > r # condition on low-rankness
         U = basis(k, x)
         V = x === y ? U : basis(k, y)
-        return LowRank(U, V')
+        return LazyMatrixProduct(U, V')
     else
         return Gramian(k, x, y) # should these be dense?
     end

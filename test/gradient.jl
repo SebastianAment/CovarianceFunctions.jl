@@ -1,17 +1,18 @@
 module TestGradient
 using Test
-using CovarianceFunctions
-using CovarianceFunctions: EQ, RQ, Dot, ExponentialDot, NN, Lengthscale
-using CovarianceFunctions: GradientKernel, ValueGradientKernel,
-                           DerivativeKernel, ValueDerivativeKernel,
-                           input_trait, BlockFactorization
 using LinearAlgebra
+using BlockFactorizations
+
+using CovarianceFunctions
+using CovarianceFunctions: EQ, RQ, Dot, ExponentialDot, NN, Lengthscale, input_trait,
+      GradientKernel, ValueGradientKernel, DerivativeKernel, ValueDerivativeKernel
+
 const AbstractMatOrFac = Union{AbstractMatrix, Factorization}
 
 @testset "gradient kernels" begin
     # nd test
-    n = 32
-    d = 16
+    n = 5
+    d = 7
     # n = 2
     # d = 2
     X = randn(d, n) / sqrt(d)
@@ -50,17 +51,17 @@ const AbstractMatOrFac = Union{AbstractMatrix, Factorization}
         end
 
         # testing matrix solve
-        # println("div")
         for k in [EQ(), RQ(1.)] # TODO: better conditioned NN kernel with bias
             G = GradientKernel(k)
             K = CovarianceFunctions.gramian(G, X)
             a = randn(n*d)
-            Ka = K*a
-            as = K\Ka
+            Ka = K * a
+            as = K \ Ka
             @test norm(K*as-Ka) / norm(Ka) < 1e-6
         end
     end
 
+    # TODO:
     @testset "ValueGradientKernel" begin
         kernels = [Dot(), Dot()^3] #[EQ(), RQ(1.)]#, Dot(), Dot()^3, NN()]
         a = randn((d+1)*n)

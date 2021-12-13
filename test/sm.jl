@@ -2,7 +2,7 @@ module TestSpectralMixture
 using CovarianceFunctions
 using CovarianceFunctions: parameters, nparameters, isstationary
 using Test
-# TODO: test on real data
+# IDEA: test on real data
 # dataset:
 # https://cdiac.ess-dive.lbl.gov/ftp/trends/co2/maunaloa.co2
 @testset "spectral mixture kernel" begin

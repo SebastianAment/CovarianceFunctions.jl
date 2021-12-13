@@ -2,7 +2,7 @@ module TestStationary
 
 using Test
 using LinearAlgebra
-using LinearAlgebraExtensions: LowRank
+# using LinearAlgebraExtensions: LowRank
 
 using CovarianceFunctions
 using CovarianceFunctions: MercerKernel, StationaryKernel, isstationary, isisotropic,
@@ -133,7 +133,7 @@ end
     @test kl(x, y) ≈ k(U*x, U*y)
     @test kl(x, y) ≈ k(sqrt((x-y)'*(U'U)*(x-y)))
 
-    S = LowRank(U')
+    S = U'U # LowRank(U')
     kSLR = CovarianceFunctions.Energetic(k, S)
     @test kSLR(x, y) ≈ kl(x, y)
 

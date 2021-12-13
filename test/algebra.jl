@@ -5,9 +5,8 @@ using LinearAlgebra
 using CovarianceFunctions: AbstractKernel, IsotropicKernel, ismercer, isstationary, isisotropic
 
 using CovarianceFunctions
-using CovarianceFunctions: Constant, EQ, RQ, Exp, γExp, Delta, Cosine, MaternP, Matern#, SM
-using CovarianceFunctions: separable, gramian
-using LinearAlgebraExtensions: grid
+using CovarianceFunctions: Constant, EQ, RQ, Exp, γExp, Delta, Cosine, MaternP, Matern #, SM
+using CovarianceFunctions: separable, gramian, grid
 using KroneckerProducts: KroneckerProduct
 
 # TODO:

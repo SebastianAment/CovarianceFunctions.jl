@@ -15,22 +15,18 @@ using DiffResults
 
 using SpecialFunctions: gamma, besselk
 
-using LazyLinearAlgebra
-using LazyLinearAlgebra: evaluate_block!
-using LinearAlgebraExtensions # TODO: check how much of this we are using except cholesky
-using LinearAlgebraExtensions: AbstractMatOrFac
 using KroneckerProducts
-using WoodburyIdentity
-
-const AbstractVecOfVec{T} = AbstractVector{<:AbstractVector{T}}
-const AbstractVecOfVecOrMat{T} = AbstractVector{<:AbstractVecOrMat{T}}
+using WoodburyFactorizations
+using BlockFactorizations
 
 abstract type AbstractKernel{T} end
 abstract type MercerKernel{T} <: AbstractKernel{T} end
 abstract type StationaryKernel{T} <: MercerKernel{T} end
 abstract type IsotropicKernel{T} <: StationaryKernel{T} end # ίσος + τρόπος (equal + way)
 
-# TODO: rewrite stationary kernels as function of r² to avoid AD problems
+const default_tol = 1e-6 # default tolerance for matrix solves and products
+
+# IDEA: rewrite stationary kernels as function of r² to avoid AD problems
 
 # class of matrix-valued kernels for multi-output GPs
 abstract type MultiKernel{T} <: AbstractKernel{T} end # MultiKernel
@@ -39,6 +35,9 @@ Base.getindex(K::MultiKernel, i, j) = (x, y) -> getindex(K(x, y), i, j)
 
 # first, utility functions
 include("util.jl")
+include("lazy_linear_algebra.jl") # TODO: separate out into package
+include("lazy_grid.jl")
+
 include("derivatives.jl")
 include("parameters.jl")
 
@@ -57,4 +56,4 @@ include("gradient_algebra.jl")
 include("hessian.jl")
 include("separable.jl")
 
-end # Kernel
+end # CovarianceFunctions

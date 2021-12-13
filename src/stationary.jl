@@ -1,5 +1,5 @@
 ############################ stationary kernels ################################
-using LinearAlgebraExtensions: ispsd, difference
+# using LinearAlgebraExtensions: difference
 # notation:
 # x, y inputs
 # τ = x-y difference of inputs
