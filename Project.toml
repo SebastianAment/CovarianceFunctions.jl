@@ -1,7 +1,7 @@
 name = "CovarianceFunctions"
 uuid = "b3329135-7958-41d4-bb02-e084c5a526bf"
 authors = ["sebastianament"]
-version = "0.1.0"
+version = "0.2.0"
 
 [deps]
 BlockFactorizations = "5c499583-5bfe-4591-9b59-c1e192d48697"
