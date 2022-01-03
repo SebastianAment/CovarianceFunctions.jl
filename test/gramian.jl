@@ -1,5 +1,4 @@
 module TestGramian
-
 using CovarianceFunctions
 using Test
 using LinearAlgebra

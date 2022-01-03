@@ -37,6 +37,7 @@ Base.getindex(K::MultiKernel, i, j) = (x, y) -> getindex(K(x, y), i, j)
 include("util.jl")
 include("lazy_linear_algebra.jl") # TODO: separate out into package
 include("lazy_grid.jl")
+include("toeplitz.jl") # special functions for toeplitz matrices -> put in ToeplitzMatrices.jl
 
 include("derivatives.jl")
 include("parameters.jl")
