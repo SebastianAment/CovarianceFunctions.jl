@@ -44,6 +44,7 @@ using BlockFactorizations
     @test typeof(k(x[1], x[1])) <: eltype(G)
 
     # rectangular multiply
+    x = randn(n)
     y = randn(2n)
     G = gramian(k, x, y)
     @test size(G) == (n, 2n)

@@ -19,7 +19,7 @@ function durbin!(y::AbstractVector, r::AbstractVector)
     for k in 1:n-1
         β *= (1-α^2)
         r_k, y_k = @views r[1:k], y[1:k]
-        α = @views -(r[k+1] + reverse_dot(r_k, y_k)) / β
+        α = -(r[k+1] + reverse_dot(r_k, y_k)) / β
         reverse_increment!(y_k, y_k, α)
         y[k+1] = α
     end
@@ -85,7 +85,7 @@ function levinson!(x::AbstractVector, r::AbstractVector, b::AbstractVector,
     @inbounds for k in 1:n-1
         β *= (1-α^2)
         r_k, x_k, y_k  = @views r[1:k], x[1:k], y[1:k]
-        μ = @views (b[k+1] - reverse_dot(r_k, x_k)) / β
+        μ = (b[k+1] - reverse_dot(r_k, x_k)) / β
         reverse_increment!(x_k, y_k, μ)
         x[k+1] = μ
         if k < n-1

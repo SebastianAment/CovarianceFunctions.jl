@@ -49,7 +49,8 @@ include("transformation.jl")
 include("mercer.jl") # general mercer kernels
 
 include("properties.jl")
-include("gramian.jl") # deprecate in favor of kernel matrix?
+include("gramian.jl")
+# include("sparse.jl")
 
 # including multi-output kernels
 include("gradient.jl")

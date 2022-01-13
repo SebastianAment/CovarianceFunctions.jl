@@ -81,6 +81,9 @@ function Base.Matrix(G::Gramian)
     end
     return M
 end
+Base.AbstractMatrix(G::Gramian) = Matrix(G)
+Base.adjoint(G::Gramian) = Gramian(G.k, G.y, G.x)
+Base.transpose(G::Gramian) = Gramian(G.k, G.y, G.x)
 
 # need this for blockmul! to work in BlockFactorization
 # specialization for Gramians of matrix-valued kernels

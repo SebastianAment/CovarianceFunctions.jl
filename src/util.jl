@@ -38,8 +38,15 @@ const AbstractVecOfVecOrMat{T} = AbstractVector{<:AbstractVecOrMat{T}}
 # euclidean distance
 _d2(x::Real, y::Real) = (x-y)^2
 _d2(x::Tuple) = _d2(x...)
-euclidean2(x, y) = sum(_d2, zip(x, y))
-euclidean(x, y) = sqrt(_euclidean2(x, y))
+function euclidean2(x, y)
+    length(x) == length(y) || throw(DimensionMismatch("inputs have to have the same length: $(length(x)), $(length(y))"))
+    val = zero(promote_type(eltype(x), eltype(y)))
+    @inbounds @simd for i in eachindex(x)
+        val += (x[i]-y[i])^2
+    end
+    return val
+end
+euclidean(x, y) = sqrt(euclidean2(x, y))
 
 # energetic norm
 enorm(A::AbstractMatOrFac, x::AbstractVector) = sqrt(dot(x, A, x))

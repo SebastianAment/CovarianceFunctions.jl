@@ -27,8 +27,7 @@ using Test
         invKM = inv(KM)
         @test B ≈ invKM
 
-        a = rand(n) / n # ensures diagonal dominance
-        a[1] = 1
+        a = a[1:end-1]
         r = a[2:end]
         b = randn(n)
         y = levinson(r, b)
