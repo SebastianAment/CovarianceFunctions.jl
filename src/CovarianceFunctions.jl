@@ -6,6 +6,7 @@ export DotProductInput, IsotropicInput, GenericInput, InputTrait, input_trait
 
 using LinearAlgebra
 using SparseArrays
+using StaticArrays
 using FillArrays
 using LazyArrays
 using Base.Threads
@@ -18,6 +19,7 @@ using SpecialFunctions: gamma, besselk
 using KroneckerProducts
 using WoodburyFactorizations
 using BlockFactorizations
+using NearestNeighbors
 
 abstract type AbstractKernel{T} end
 abstract type MercerKernel{T} <: AbstractKernel{T} end
@@ -50,7 +52,7 @@ include("mercer.jl") # general mercer kernels
 
 include("properties.jl")
 include("gramian.jl")
-# include("sparse.jl")
+include("sparse.jl")
 
 # including multi-output kernels
 include("gradient.jl")

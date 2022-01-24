@@ -3,6 +3,7 @@ mercer
 stationary
 properties
 gramian
+sparse
 sm
 gradient
 gradient_algebra

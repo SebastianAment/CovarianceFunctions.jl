@@ -63,6 +63,29 @@ function checklength(x::AbstractArray, y::AbstractArray)
     return length(x)
 end
 
+# do we need an MVector version of this?
+function vector_of_static_vectors(A::AbstractMatrix)
+    D = size(A, 1)
+    [SVector{D}(col) for col in eachcol(A)]
+end
+function vector_of_static_vectors(A::AbstractVector{<:Number})
+    [SVector{1}(a) for a in A]
+end
+vector_of_static_vectors(A::Vector{V}) where {V <: Union{SVector, MVector}} = A
+# NOTE: element-vectors have
+function vector_of_static_vectors(A::Vector{<:AbstractVector})
+    # length(A) > 0 || return [SVector{0, eltype(A)}()]
+    D = size(A[1], 1)
+    [SVector{D}(a) for a in A]
+end
+
+# _Matrix(A::AbstractMatrix) = A
+# _Matrix(A::Vector{<:Union{SVector, MVector}}) = A
+# this first converts a colview back to the corresponding matrix
+# function _Matrix(x::Vector{<:SubArray{<:Any, 1, <:Matrix, Tuple{Base.Slice{Base.OneTo{Int64}}, Int64}, true}})
+#     x[1].parent
+# end
+
 ################################################################################
 # is positive semi-definite
 function ispsd end
