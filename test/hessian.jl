@@ -15,7 +15,7 @@ const AbstractMatOrFac = Union{AbstractMatrix, Factorization}
     n = 2
     d = 3
     X = randn(d, n) / sqrt(d)
-    ε = 2eps()
+    ε = 1e2eps()
     @testset "HessianKernelElements" begin
         kernels = [EQ(), RQ(1.), Dot()^4, ExponentialDot()] #, NN()]
         for k in kernels
