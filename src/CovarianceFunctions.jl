@@ -53,6 +53,7 @@ include("mercer.jl") # general mercer kernels
 include("properties.jl")
 include("gramian.jl")
 include("sparse.jl")
+include("barneshut.jl")
 
 # including multi-output kernels
 include("gradient.jl")
