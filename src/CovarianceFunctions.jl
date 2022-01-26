@@ -20,6 +20,7 @@ using KroneckerProducts
 using WoodburyFactorizations
 using BlockFactorizations
 using NearestNeighbors
+using IterativeSolvers
 
 abstract type AbstractKernel{T} end
 abstract type MercerKernel{T} <: AbstractKernel{T} end

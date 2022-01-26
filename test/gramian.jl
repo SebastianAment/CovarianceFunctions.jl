@@ -71,7 +71,7 @@ using BlockFactorizations
 end
 
 @testset "Gramian factorization" begin
-    atol = 1e-8
+    rtol = 1e-6
     k = CovarianceFunctions.EQ()
     n = 64
     x = randn(n)
@@ -79,18 +79,21 @@ end
     F = factorize(G)
     @test F isa CholeskyPivoted
     @test rank(F) < n ÷ 2 # this should be very low rank
-    @test isapprox(Matrix(F), G, atol = atol)
+    @test isapprox(Matrix(F), G, rtol = rtol)
 
-    F = cholesky(G)
+    # pivoted cholesky
+    G = gramian(k, x)
+    F = cholesky(G, Val(true), check = false, tol = 1e-6)
     @test F isa CholeskyPivoted
-    @test isapprox(Matrix(F), G, atol = atol)
+    @test isapprox(Matrix(F), G, rtol = rtol)
 
     # regular cholesky
     k = CovarianceFunctions.Exponential() # does not yield low rank matrix
     G = gramian(k, x)
-    F = cholesky(G, Val(false))
+    F = cholesky(G)
     @test F isa Cholesky
-    @test isapprox(Matrix(F), G, atol = atol)
+    @test isapprox(Matrix(F), G, rtol = rtol)
+
 
     # testing gramian of matrix-valued anonymous kernel
     A = randn(3, 2)

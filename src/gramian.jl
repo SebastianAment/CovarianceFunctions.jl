@@ -149,19 +149,24 @@ function gramian(k::StationaryKernel, x::StepRangeLen{<:Real}, ::PeriodicInput)
 end
 
 ###################### factorization of Gramian ################################
-# TODO: if we expect low rank structure, have to use special cholesky implementation
-# defaults to pivoted cholesky
-function LinearAlgebra.cholesky(G::Gramian, pivoting = Val(true); check::Bool = false)
-    cholesky!(Matrix(G), pivoting, check = check)
+# IDEA: have to use special cholesky implementation to avoid instantiating G in low rank case
+function LinearAlgebra.cholesky(G::Gramian, pivoting::Val{true}; check::Bool = false, tol::Real = 0.0)
+    cholesky!(Matrix(G), Val(true), check = check, tol = tol)
 end
 
-const default_max_cholesky_size = 2^14
+function LinearAlgebra.cholesky(G::Gramian, pivoting::Val{false} = Val(false); check::Bool = true)
+    cholesky!(Matrix(G), Val(false), check = check)
+end
+
+const DEFAULT_MAX_CHOLESKY_SIZE = 2^14
+const DEFAULT_TOL = 1e-6
 
 # TODO: add sparsification technique for exponentially decaying kernels in high d
-function LinearAlgebra.factorize(G::Gramian; max_cholesky_size::Int = default_max_cholesky_size)
+function LinearAlgebra.factorize(G::Gramian; max_cholesky_size::Int = DEFAULT_MAX_CHOLESKY_SIZE,
+                                             tol::Real = DEFAULT_TOL)
     n = checksquare(G)
-    if n ≤ max_cholesky_size
-        cholesky(G)
+    if n ≤ max_cholesky_size # defaults to pivoted cholesky to detect low rank structure
+        cholesky(G, Val(true), check = false, tol = tol)
     else # IDEA: calculate preconditioner here?
         G # if instantiating G is not possible in memory, keep lazy and proceed via cg,
     end
@@ -179,7 +184,7 @@ end
 # function LinearAlgebra.factorize(G::Gramian, ::SparseInference)
 #     return -1
 # end
-using IterativeSolvers
+
 function LinearAlgebra.:\(B::BlockGramian, b::AbstractVector)
     T = promote_type(eltype(B), eltype(b))
     x = zeros(T, size(B, 1))

@@ -2,7 +2,6 @@ using NearestNeighbors: TreeData, get_leaf_range, isleaf, getleft, getright
 
 const BARNES_HUT_DEFAULT_LEAFSIZE = 16
 
-
 # IDEA:
 struct BarnesHutFactorization{T, XT<:AbstractVector, YT<:AbstractVector, KT, TT, RT} <: Factorization{T}
     k::KT # kernel function
@@ -52,10 +51,10 @@ function Base.:*(F::BarnesHutFactorization, x::AbstractVector)
     mul!(y, F, x)
 end
 
-# use cg! if it's positive definite
-function LinearAlgebra.ldiv!(y::AbstractVector, F::BarnesHutFactorization, x::AbstractVector)
-    cg!
-end
+# # use cg! if it's positive definite
+# function LinearAlgebra.ldiv!(y::AbstractVector, F::BarnesHutFactorization, x::AbstractVector)
+#     cg!()
+# end
 
 ################################ node sums #####################################
 # computes the sums of the indices of x that correspond to each node of T

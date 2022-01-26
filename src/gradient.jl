@@ -47,7 +47,7 @@ function gradient_kernel!(K::AbstractMatrix, k, x::AbstractVector, y::AbstractVe
 end
 
 function allocate_gradient_kernel(k, x, y, T::DotProductInput)
-    U = similar(y, length(y), 1)
+    U = similar(y, length(y), 1) # IDEA: use MVecotor
     V = similar(x, length(x), 1)'
     A = Diagonal(similar(x))
     C = similar(x, 1, 1)
