@@ -331,6 +331,7 @@ end
 # this is neccesary when evaluate!(::ValueGradientHessianKernel) is called
 # defines mul!
 # TODO: increase pre-allocation
+# TODO: unify this with DerivativeKernelElement
 struct ValueGradientHessianKernelElement{T, K, X<:AbstractVector{T}, Y} <: Factorization{T}
    k::K
    x::X

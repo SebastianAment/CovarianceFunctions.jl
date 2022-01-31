@@ -47,10 +47,10 @@ function gradient_kernel!(K::AbstractMatrix, k, x::AbstractVector, y::AbstractVe
 end
 
 function allocate_gradient_kernel(k, x, y, T::DotProductInput)
-    U = similar(y, length(y), 1) # IDEA: use MVecotor
-    V = similar(x, length(x), 1)'
-    A = Diagonal(similar(x))
-    C = similar(x, 1, 1)
+    U = reshape(zero(y), :, 1)
+    V = reshape(zero(x), :, 1)'
+    A = Diagonal(zero(x))
+    C = MMatrix{1, 1}(k(x, y))
     W = Woodbury(A, U, C, V) # needs to be separate from IsotropicInput,
 end
 
@@ -67,9 +67,11 @@ function gradient_kernel!(K::Woodbury, k, x::AbstractVector, y::AbstractVector, 
 end
 
 function allocate_gradient_kernel(k, x, y, T::IsotropicInput)
-    r = similar(x, length(x), 1)
-    D = Diagonal(similar(x))
-    C = similar(x, 1, 1)
+    r = reshape(x - y, :, 1) # do these work without reshape?
+    kxy = k(x, y)
+    d = length(x)
+    D = Diagonal(MVector{d, typeof(kxy)}(undef)) # not using Fill here, because value can't be changed
+    C = MMatrix{1, 1}(kxy)
     K = Woodbury(D, r, C, r')
 end
 
@@ -96,9 +98,11 @@ gradient_kernel!(K::Zeros, k::Constant, x, y, ::InputTrait) = K
 # specialization of gradient nn kernel, written before more general AD-implementation,
 # which obviates the need for special derivations like these
 function allocate_gradient_kernel(k::NeuralNetwork, x, y, ::GenericInput)
-    U = hcat(x, y)
-    D = Diagonal(similar(x))
-    C = similar(x, 2, 2)
+    U = hcat(x, y) # this preserves static arrays
+    D = Diagonal(zero(x))
+    # C = similar(x, 2, 2)
+    elty = typeof(k(x, y))
+    C = zero(MMatrix{2, 2, elty})
     K = Woodbury(D, U, C, U')
 end
 
@@ -132,6 +136,189 @@ function gradient_kernel!(K::Woodbury, k::NeuralNetwork, x, y, ::GenericInput = 
 end
 
 ################################################################################
+# structure that holds the potentially heterogeneous types of covariances between
+# a kernel value and its derivatives
+# mutable only because of value_value?
+mutable struct DerivativeKernelElement{T, VV, VG, GV, GG, VH, HV, GH, HG, HH, GI, HI} <: AbstractMatrix{T}
+    value_value::VV # value-value covariance (IDEA: if this is MMAtrix, could make structure non-mutable)
+    value_gradient::VG # value-gradient covariance
+    gradient_value::GV # gradient-value covariance
+    gradient_gradient::GG # ...
+    value_hessian::VH
+    hessian_value::HV
+    gradient_hessian::GH
+    hessian_gradient::HG
+    hessian_hessian::HH
+    gradient_indices::GI
+    hessian_indices::HI
+end
+
+function DerivativeKernelElement(vv, vg, gv, gg, vh = nothing, hv = nothing, gh = nothing, hg = nothing, hh = nothing)
+    t = (vv, vg, gv, gg, vh, hv, gh, hg, hh)
+    s = something(t...) # get the first input that's not nothing
+    T = eltype(s)
+    gi = gradient_indices(vv, gg)
+    hi = hessian_indices(vv, gg, hh)
+    DerivativeKernelElement{T, typeof.(t)..., typeof(gi), typeof(hi)}(t..., gi, hi)
+end
+
+function gradient_indices(value_value, gradient_gradient)
+    i = 0
+    if !isnothing(value_value)
+        i += 1
+    end
+    if !isnothing(gradient_gradient)
+        d = size(gradient_gradient, 1)
+        return (i + 1) : (i + d)
+    else
+        return nothing
+    end
+end
+
+function hessian_indices(value_value, gradient_gradient, hessian_hessian)
+    i = 0
+    if !isnothing(value_value)
+        i += 1
+    end
+    if !isnothing(gradient_gradient)
+        d = size(gradient_gradient, 1)
+        i += d
+    end
+    if !isnothing(hessian_hessian)
+        dd = size(hessian_hessian, 1)
+        return (i + 1) : (i + dd)
+    else
+        return nothing
+    end
+end
+
+Base.eltype(A::DerivativeKernelElement{T}) where {T} = T
+function Base.size(A::DerivativeKernelElement)
+    n = 0
+    if !isnothing(A.value_value)
+        n += 1
+    end
+    if !isnothing(A.gradient_gradient)
+        n += size(A.gradient_gradient, 1)
+    end
+    if !isnothing(A.hessian_hessian)
+        n += size(A.hessian_hessian, 1)
+    end
+    return (n, n)
+end
+Base.size(A::DerivativeKernelElement, i::Int) = i <= 2 ? size(A)[i] : 1
+
+# TODO: efficient indexing
+function Base.getindex(A::DerivativeKernelElement, i::Int, j::Int)
+    # Matrix(A)[i, j]
+    @boundscheck begin
+        n = size(A, 1)
+        (1 <= i <= n && 1 <= j <= n) || throw(BoundsError("attempt to access $(size(A)) DerivativeKernelElement at index ($i, $j)"))
+    end
+    gi = A.gradient_indices
+    hi = A.hessian_indices
+    if !isnothing(A.value_value)
+        (i == 1 && j == 1) && return A.value_value
+        if i == 1
+            (!isnothing(gi) && j in gi) && return A.value_gradient[findfirst(==(j), gi)]
+            (!isnothing(hi) && j in hi) && return A.value_hessian[findfirst(==(j), hi)]
+        end
+        if j == 1
+            (!isnothing(gi) && i in gi) && return A.gradient_value[findfirst(==(i), gi)]
+            (!isnothing(hi) && i in hi) && return A.hessian_value[findfirst(==(i), hi)]
+        end
+    end
+    if !isnothing(gi)
+        (i in gi && j in gi) && return A.gradient_gradient[findfirst(==(i), gi), findfirst(==(j), gi)]
+        if !isnothing(hi)
+            (i in gi && j in hi) && return A.gradient_hessian[findfirst(==(i), gi), findfirst(==(j), hi)]
+            (i in hi && j in gi) && return A.hessian_gradient[findfirst(==(i), hi), findfirst(==(j), gi)]
+        end
+    end
+    if !isnothing(hi)
+        return A.hessian_hessian[findfirst(==(i), hi), findfirst(==(j), hi)]
+    end
+    error("this should never happen")
+end
+
+function LinearAlgebra.mul!(y::AbstractVector, A::DerivativeKernelElement, x::AbstractVector, α::Number = 1, β::Number = 0)
+    y .*= β
+    gi = A.gradient_indices
+    hi = A.hessian_indices
+    if !isnothing(A.value_value)
+        y[1] += α * A.value_value * x[1]
+    end
+    if !isnothing(A.value_gradient)
+        xg, yg = @views x[gi], y[gi]
+        y[1] += α * dot(A.value_gradient, xg)
+        @. yg += α * A.gradient_value * x[1]
+    end
+    if !isnothing(A.gradient_gradient)
+        xg, yg = @views x[gi], y[gi]
+        mul!(yg, A.gradient_gradient, xg, α, 1)
+    end
+    if !isnothing(A.value_hessian)
+        xh, yh = @views x[hi], y[hi]
+        y[1] += α * dot(A.value_hessian, xh)
+        @. yh += α * A.hessian_value * x[1]
+    end
+    if !isnothing(A.gradient_hessian)
+        xg, yg = @views x[gi], y[gi]
+        xh, yh = @views x[hi], y[hi]
+        mul!(yg, A.gradient_hessian, xh, α, 1)
+        mul!(yh, A.hessian_gradient, xg, α, 1)
+    end
+    if !isnothing(A.hessian_hessian)
+        xh, yh = @views x[hi], y[hi]
+        mul!(yh, A.hessian_hessian, xh, α, 1)
+    end
+    return y
+end
+
+function Base.Matrix(A::DerivativeKernelElement)
+    n = size(A, 1)
+    M = zeros(eltype(A), n, n)
+    gradient_index = 0
+    hessian_index = 0
+    if !isnothing(A.value_value)
+        M[1, 1] = A.value_value
+        gradient_index += 1 # if we have a value variance, gradient indices are 2:2+d
+        hessian_index += 1
+    end
+    if !isnothing(A.value_gradient)
+        d = length(A.value_gradient)
+        @. M[2:1+d, 1] = A.gradient_value
+        @. M[1, 2:1+d] = A.value_gradient
+    end
+    if !isnothing(A.gradient_gradient)
+        d = size(A.gradient_gradient, 1)
+        gi = gradient_index+1:gradient_index+d
+        M[gi, gi] .= Matrix(A.gradient_gradient)
+        hessian_index += d + 1 # if we have a gradient covariances, hessian indices are (1 + hasvalue? + d + 1)
+    end
+    if !isnothing(A.value_hessian)
+        dd = length(A.value_hessian)
+        hi = hessian_index+1:hessian_index+dd
+        @. M[1, hi] = A.value_hessian
+        @. M[hi, 1] = A.hessian_value
+    end
+    if !isnothing(A.gradient_hessian)
+        d, dd = size(A.gradient_hessian)
+        gi = gradient_index+1:gradient_index+d
+        hi = hessian_index+1:hessian_index+dd
+        M[gi, hi] .= Matrix(A.gradient_hessian)
+        M[hi, gi] .= Matrix(A.hessian_gradient)
+    end
+    if !isnothing(A.hessian_hessian)
+        dd = size(A.hessian_hessian, 1)
+        hi = hessian_index+1:hessian_index+dd
+        M[hi, hi] .= Matrix(A.hessian_hessian)
+    end
+    return M
+end
+
+########################## using new kernel element ############################
+################################################################################
 # [f, ∂f] ∼ GP([μ, ∂μ], dK) # value + gradient kernel
 # IDEA: For efficiency, maybe create ValueGradientKernelElement like in hessian.jl
 # currently, this is an order of magnitude slower than GradientKernel
@@ -158,89 +345,54 @@ end
 
 function value_gradient_kernel(k, x::AbstractVector, y::AbstractVector, T::InputTrait = input_trait(G.k))
     d = length(x)
-    A22 = allocate_gradient_kernel(k, x, y, T)
-    A = if A22 isa Matrix
-            [similar(x, 0, 0) for i in 1:2, j in 1:2]
-        else
-            Matrix{AbstractMatOrFac{eltype(x)}}(undef, 2, 2) # this could be more concrete if T = GenericInput
-        end
-    A[1, 1] = zeros(1, 1)
-    A[1, 2] = zeros(1, d)
-    A[2, 1] = zeros(d, 1)
-    A[2, 2] = A22
-    nindices = (1, 2, d+2)
-    K = BlockFactorization(A, nindices, nindices)
-    return value_gradient_kernel!(K, k, x, y, T)
+    kxy = k(x, y)
+    value_value = kxy
+    value_gradient = MVector{d, typeof(kxy)}(undef)
+    gradient_value = MVector{d, typeof(kxy)}(undef)
+    gradient_gradient = allocate_gradient_kernel(k, x, y, T)
+    K = DerivativeKernelElement(value_value, value_gradient, gradient_value, gradient_gradient)
+    value_gradient_kernel!(K, k, x, y, T)
 end
+
 # IDEA: specialize evaluate for IsotropicInput, DotProductInput
 # returns block matrix
-function value_gradient_kernel!(K::BlockFactorization, k, x::AbstractVector, y::AbstractVector, T::InputTrait)
-    # value = zero(eltype(x))
-    # derivs = K.A[1, 2]
-    # r = DiffResults.DiffResult(value, derivs)
-    # ForwardDiff.gradient!(r, z->k(x, z), y)
-    # K.A[1, 1] .= r.value
-    #
-    # derivs = K.A[2, 1]
-    # r = DiffResults.DiffResult(value, derivs)
-    # ForwardDiff.gradient!(r, z->k(z, y), x)
-    # println("here")
-    # a = K.A[1, 1]
-    # println(a)
-    # println(typeof(a))
-    # println(k(x, y))
-    K.A[1, 1][1, 1] = k(x, y) # FIXME this line is problematic
-    K.A[1, 2] .= ForwardDiff.gradient(z->k(x, z), y)' # ForwardDiff.gradient!(r, z->k(z, y), x)
-    K.A[2, 1] .= ForwardDiff.gradient(z->k(z, y), x)
-    gradient_kernel!(K.A[2, 2], k, x, y, T) # call GradientKernel for component
+function value_gradient_kernel!(K::DerivativeKernelElement, k, x::AbstractVector, y::AbstractVector, T::InputTrait)
+    K.value_value = k(x, y)
+    K.value_gradient .= ForwardDiff.gradient(z->k(x, z), y) # ForwardDiff.gradient!(r, z->k(z, y), x)
+    K.gradient_value .= ForwardDiff.gradient(z->k(z, y), x)
+    gradient_kernel!(K.gradient_gradient, k, x, y, T) # call GradientKernel for component
     return K
 end
 
-function value_gradient_kernel!(K::BlockFactorization, k, x::AbstractVector, y::AbstractVector, T::DotProductInput)
+function value_gradient_kernel!(K::DerivativeKernelElement, k, x::AbstractVector, y::AbstractVector, T::DotProductInput)
     f = _derivative_helper(k)
     xy = dot(x, y)
     k0, k1 = value_derivative(f, xy)
-    K.A[1, 1][1, 1] = k0 # FIXME this line is problematic
-    @. K.A[1, 2] = k1*x' # ForwardDiff.gradient(z->k(x, z), y)'
-    @. K.A[2, 1] = k1*y # ForwardDiff.gradient(z->k(z, y), x)
-    gradient_kernel!(K.A[2, 2], k, x, y, T) # call GradientKernel for component
+    K.value_value = k0
+    @. K.value_gradient = k1*x # ForwardDiff.gradient(z->k(x, z), y)'
+    @. K.gradient_value = k1*y # ForwardDiff.gradient(z->k(z, y), x)
+    gradient_kernel!(K.gradient_gradient, k, x, y, T) # call GradientKernel for component
     return K
 end
 
-function value_gradient_kernel!(K::BlockFactorization, k, x::AbstractVector, y::AbstractVector, T::IsotropicInput)
+function value_gradient_kernel!(K::DerivativeKernelElement, k, x::AbstractVector, y::AbstractVector, T::IsotropicInput)
     f = _derivative_helper(k)
-    r = K.A[2, 1]
+    r = K.gradient_value
     @. r = x - y
     d² = sum(abs2, r)
     k0, k1 = value_derivative(f, d²)
-    K.A[1, 1][1, 1] = k0 # FIXME this line is problematic
-    @. K.A[1, 2] = r'
-    @. K.A[1, 2] *= -2k1 # ForwardDiff.gradient(z->k(x, z), y)'
-    @. K.A[2, 1] *= 2k1 # ForwardDiff.gradient(z->k(z, y), x)
-    gradient_kernel!(K.A[2, 2], k, x, y, T) # call GradientKernel for component
+    K.value_value = k0
+    @. K.value_gradient = r
+    @. K.value_gradient *= -2k1 # ForwardDiff.gradient(z->k(x, z), y)'
+    @. K.gradient_value *= 2k1 # ForwardDiff.gradient(z->k(z, y), x)
+    gradient_kernel!(K.gradient_gradient, k, x, y, T) # call GradientKernel for component
     return K
 end
 
-function BlockFactorizations.evaluate_block!(K::BlockFactorization, G::ValueGradientKernel,
+function BlockFactorizations.evaluate_block!(K::DerivativeKernelElement, G::ValueGradientKernel,
             x::AbstractVector, y::AbstractVector, T::InputTrait = input_trait(G.k))
     value_gradient_kernel!(K, G.k, x, y, T)
 end
-
-# function evaluate!(K::AbstractMatrix, g::ValueGradientKernel, x::AbstractVector, y::AbstractVector, ::GenericInput)
-#     function value_gradient(k, x::AbstractVector, y::AbstractVector)
-#         r = DiffResults.GradientResult(y) # this could take pre-allocated temporary storage
-#         ForwardDiff.gradient!(r, z->k(z, y), x)
-#         r = vcat(r.value, r.derivs[1]) # d+1 # ... to avoid this
-#     end
-#     println(size(K))
-#     value = @view K[:, 1] # value of helper, i.e. original value and gradient stacked
-#     derivs = @view K[:, 2:end] # jacobian of helper (higher order terms)
-#     result = DiffResults.DiffResult(value, derivs)
-#     println(result)
-#     ForwardDiff.jacobian!(result, z->value_gradient(g.k, x, z), y)
-#     display(K)
-#     return K
-# end
 
 ################################################################################
 # for 1d inputs

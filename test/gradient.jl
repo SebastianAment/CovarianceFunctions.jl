@@ -5,7 +5,8 @@ using BlockFactorizations
 
 using CovarianceFunctions
 using CovarianceFunctions: EQ, RQ, Dot, ExponentialDot, NN, Lengthscale, input_trait,
-      GradientKernel, ValueGradientKernel, DerivativeKernel, ValueDerivativeKernel
+      GradientKernel, ValueGradientKernel, DerivativeKernel, ValueDerivativeKernel,
+      DerivativeKernelElement
 
 const AbstractMatOrFac = Union{AbstractMatrix, Factorization}
 
