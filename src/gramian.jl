@@ -151,11 +151,11 @@ end
 ###################### factorization of Gramian ################################
 # IDEA: have to use special cholesky implementation to avoid instantiating G in low rank case
 function LinearAlgebra.cholesky(G::Gramian, pivoting::Val{true}; check::Bool = false, tol::Real = 0.0)
-    cholesky!(Matrix(G), Val(true), check = check, tol = tol)
+    cholesky!(Symmetric(Matrix(G)), Val(true), check = check, tol = tol)
 end
 
 function LinearAlgebra.cholesky(G::Gramian, pivoting::Val{false} = Val(false); check::Bool = true)
-    cholesky!(Matrix(G), Val(false), check = check)
+    cholesky!(Symmetric(Matrix(G)), Val(false), check = check)
 end
 
 const DEFAULT_MAX_CHOLESKY_SIZE = 2^14

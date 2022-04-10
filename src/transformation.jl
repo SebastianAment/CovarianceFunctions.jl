@@ -26,6 +26,7 @@ end
 ########################### Change of Input Norm  ##############################
 # apply a different norm to input radius r of a stationary kernel
 # special case of input transformation functional
+# TODO: make differentiable with ForwardDiff at zero!
 struct Normed{T, K, N} <: StationaryKernel{T}
     k::K
     n::N # norm for r call
