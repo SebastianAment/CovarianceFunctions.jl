@@ -95,14 +95,14 @@ end
 # by default, Gramians of matrix-valued kernels are BlockFactorizations, O(1) memory complexity
 function gramian(k::MultiKernel, x::AbstractVector, y::AbstractVector, lazy::Val{true} = Val(true))
     G = Gramian(k, x, y)
-    BlockFactorization(G)
+    BlockFactorization(G, isstrided = true) # strided because every block has same size
 end
 
 # instantiates the blocks but respects structure O(n^2d) memory complexity for gradient kernel
 function gramian(k::MultiKernel, x::AbstractVector, y::AbstractVector, lazy::Val{false})
     G = Gramian(k, x, y)
     G = Matrix(G)
-    BlockFactorization(G)
+    BlockFactorization(G, isstrided = true)
 end
 
 LinearAlgebra.issymmetric(G::Gramian) = (G.x ≡ G.y) || (G.x == G.y) # pointer check is constant time
