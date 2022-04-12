@@ -1,7 +1,7 @@
 name = "CovarianceFunctions"
 uuid = "b3329135-7958-41d4-bb02-e084c5a526bf"
 authors = ["sebastianament"]
-version = "0.2.3"
+version = "0.2.4"
 
 [deps]
 BlockFactorizations = "5c499583-5bfe-4591-9b59-c1e192d48697"
@@ -22,7 +22,7 @@ ToeplitzMatrices = "c751599d-da0a-543b-9d20-d0a503d91d24"
 WoodburyFactorizations = "9f1bac23-581c-4ebc-bd36-df60d764636d"
 
 [compat]
-BlockFactorizations = "1.2"
+BlockFactorizations = "1.2.1"
 DiffResults = "1.0"
 FillArrays = "0.12, 0.13"
 ForwardDiff = "0.10"

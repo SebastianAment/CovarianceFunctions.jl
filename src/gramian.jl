@@ -85,13 +85,6 @@ Base.AbstractMatrix(G::Gramian) = Matrix(G)
 Base.adjoint(G::Gramian) = Gramian(G.k, G.y, G.x)
 Base.transpose(G::Gramian) = Gramian(G.k, G.y, G.x)
 
-# need this for blockmul! to work in BlockFactorization
-# specialization for Gramians of matrix-valued kernels
-# IDEA: precompute input_trait?
-function BlockFactorizations.evaluate_block!(Gij, G::Gramian{<:Any, <:MultiKernel}, i::Int, j::Int)
-    BlockFactorizations.evaluate_block!(Gij, G.k, G.x[i], G.y[j], input_trait(G.k))
-end
-
 # by default, Gramians of matrix-valued kernels are BlockFactorizations, O(1) memory complexity
 function gramian(k::MultiKernel, x::AbstractVector, y::AbstractVector, lazy::Val{true} = Val(true))
     G = Gramian(k, x, y)
@@ -99,7 +92,7 @@ function gramian(k::MultiKernel, x::AbstractVector, y::AbstractVector, lazy::Val
 end
 
 # instantiates the blocks but respects structure O(n^2d) memory complexity for gradient kernel
-function gramian(k::MultiKernel, x::AbstractVector, y::AbstractVector, lazy::Val{false})
+function gramian(k::MultiKernel, x::AbstractVector, y::AbstractVector, lazy::Val{false}) # = Val(false))
     G = Gramian(k, x, y)
     G = Matrix(G)
     BlockFactorization(G, isstrided = true)
@@ -185,11 +178,37 @@ end
 #     return -1
 # end
 
+###################### Specializations for BlockGramians #######################
 function LinearAlgebra.:\(B::BlockGramian, b::AbstractVector)
     T = promote_type(eltype(B), eltype(b))
     x = zeros(T, size(B, 1))
     ldiv!(x, B, b)
 end
+# solve general BlockGramian via conjugate gradient solver
 function LinearAlgebra.ldiv!(x::AbstractVector, B::BlockGramian, b::AbstractVector)
     cg!(x, B, b)
+end
+
+# carries out multiplication for general BlockFactorization
+function BlockFactorizations.blockmul!(y::AbstractVecOfVecOrMat, G::Gramian, x::AbstractVecOfVecOrMat, α::Real = 1, β::Real = 0)
+    Gijs = [G[1, 1] for _ in 1:Base.Threads.nthreads()] # pre-allocate storage for elements
+    IT = input_trait(G.k)
+    @threads for i in eachindex(y)
+        @. y[i] = β * y[i]
+        Gij = Gijs[Base.Threads.threadid()]
+        for j in eachindex(x)
+            Gij = evaluate_block!(Gij, G, i, j, IT) # this is change to original blockmul!, allowing evaluation of Gramian's elements without additional allocations
+            mul!(y[i], Gij, x[j], α, 1)
+        end
+    end
+    return y
+end
+
+function evaluate_block!(Gij, G::Gramian, i::Int, j::Int, T = input_trait(G.k))
+    evaluate_block!(Gij, G.k, G.x[i], G.y[j], T)
+end
+
+# fallback
+function evaluate_block!(Gij, k, x, y, T = input_trait(G.k))
+    k(x, y)
 end

@@ -64,7 +64,7 @@ end
 #     return K
 # end
 
-# function BlockFactorizations.evaluate_block!(K::HessianKernelElement, G::HessianKernel, x::AbstractVector, y::AbstractVector, T::InputTrait = input_trait(G))
+# function evaluate_block!(K::HessianKernelElement, G::HessianKernel, x::AbstractVector, y::AbstractVector, T::InputTrait = input_trait(G))
 #     hessian_kernel!(K, G.k, x, y, T)
 # end
 
@@ -118,8 +118,8 @@ function allocate_hessian_kernel(k, x, y, ::IsotropicInput)
     IsotropicHessianKernelElement(k, copy(x), copy(y))
 end
 
-function BlockFactorizations.evaluate_block!(K::IsotropicHessianKernelElement,
-    G::HessianKernel, x::AbstractVector, y::AbstractVector, ::IsotropicInput = IsotropicInput())
+function evaluate_block!(K::IsotropicHessianKernelElement, G::HessianKernel,
+    x::AbstractVector, y::AbstractVector, ::IsotropicInput = IsotropicInput())
     hessian_kernel!(K, G.k, x, y)
 end
 
@@ -223,8 +223,8 @@ function allocate_hessian_kernel(k, x, y, ::DotProductInput)
     DotProductHessianKernelElement(k, copy(x), copy(y))
 end
 # necessary for BlockFactorization
-function BlockFactorizations.evaluate_block!(K::DotProductHessianKernelElement,
-    G::HessianKernel, x::AbstractVector, y::AbstractVector, ::DotProductInput = DotProductInput())
+function evaluate_block!(K::DotProductHessianKernelElement, G::HessianKernel,
+    x::AbstractVector, y::AbstractVector, ::DotProductInput = DotProductInput())
     hessian_kernel!(K, G.k, x, y)
 end
 function hessian_kernel!(K::DotProductHessianKernelElement, k, x::AbstractVector, y::AbstractVector, ::DotProductInput = DotProductInput())
@@ -350,8 +350,8 @@ function value_gradient_hessian_kernel!(K::ValueGradientHessianKernelElement, k,
     return K
 end
 
-function BlockFactorizations.evaluate_block!(K::ValueGradientHessianKernelElement,
-    G::ValueGradientHessianKernel, x::AbstractVector, y::AbstractVector, T::InputTrait = input_trait(G.k))
+function evaluate_block!(K::ValueGradientHessianKernelElement, G::ValueGradientHessianKernel,
+        x::AbstractVector, y::AbstractVector, T::InputTrait = input_trait(G.k))
     value_gradient_hessian_kernel!(K, G.k, x, y, T)
 end
 

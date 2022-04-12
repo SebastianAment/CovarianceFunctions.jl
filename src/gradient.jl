@@ -21,9 +21,9 @@ function (G::GradientKernel)(x::AbstractVector, y::AbstractVector)
     gradient_kernel(G.k, x, y, input_trait(G.k))
 end
 
-# necessary for blockmul! of BlockFactorization
-function BlockFactorizations.evaluate_block!(K::AbstractMatOrFac, G::GradientKernel,
-            x::AbstractVector, y::AbstractVector, T::InputTrait = input_trait(G))
+# need this to work with BlockFactorizations, see blockmul! in gramian
+function evaluate_block!(K::AbstractMatOrFac, G::GradientKernel,
+            x::AbstractVector, y::AbstractVector, T::InputTrait = input_trait(G.k))
     gradient_kernel!(K, G.k, x, y, T)
 end
 
@@ -70,7 +70,9 @@ function allocate_gradient_kernel(k, x, y, T::IsotropicInput)
     r = reshape(x - y, :, 1) # do these work without reshape?
     kxy = k(x, y)
     d = length(x)
-    D = Diagonal(MVector{d, typeof(kxy)}(undef)) # not using Fill here, because value can't be changed
+    # IDEA: have mutable Fill, since this is all we need, will save further allocations, check mutable_fill.jl in doodles
+    # D = Diagonal(MVector{d, typeof(kxy)}(undef)) # not using Fill here, because value can't be changed
+    D = Diagonal(zeros(typeof(kxy), d)) # not using Fill here, because value can't be changed
     C = MMatrix{1, 1}(kxy)
     K = Woodbury(D, r, C, r')
 end
@@ -389,7 +391,8 @@ function value_gradient_kernel!(K::DerivativeKernelElement, k, x::AbstractVector
     return K
 end
 
-function BlockFactorizations.evaluate_block!(K::DerivativeKernelElement, G::ValueGradientKernel,
+# need this to work with BlockFactorizations, see blockmul! in gramian
+function evaluate_block!(K::DerivativeKernelElement, G::ValueGradientKernel,
             x::AbstractVector, y::AbstractVector, T::InputTrait = input_trait(G.k))
     value_gradient_kernel!(K, G.k, x, y, T)
 end
