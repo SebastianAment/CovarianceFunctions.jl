@@ -8,8 +8,7 @@ vecofvec(A::AbstractMatrix) = [a for a in eachcol(A)] # one view allocates 64 by
 # note: gramian specializations for special matrix structure has to be after definition of all kernels
 # move to MyLazyArrays?
 # K can be any kernel, so not necessarily MercerKernel
-struct Gramian{T, K, U<:AbstractVector,
-                V<:AbstractVector} <: AbstractMatrix{T}
+struct Gramian{T, K, U<:AbstractVector, V<:AbstractVector} <: AbstractMatrix{T}
     k::K # has to allow k(x[i], y[j]) evaluation ∀i,j
     x::U
     y::V
@@ -30,7 +29,8 @@ Base.eltype(G::Gramian{T}) where {T} = T
 elsize(G::Gramian) = size(G[1, 1])
 
 # indexing
-function Base.getindex(G::Gramian, i::Integer, j::Integer)
+# NOTE: @inline helps increase mvm performance by 50%
+@inline function Base.getindex(G::Gramian, i::Integer, j::Integer)
     @boundscheck checkbounds(G, i, j) # add bounds check to G
     @inbounds G.k(G.x[i], G.y[j]) # remove boundscheck of x of x and y
 end
@@ -70,13 +70,29 @@ function LinearAlgebra.mul!(y::AbstractVector, G::Gramian, x::AbstractVector, α
     end
     return y
 end
+
+function LinearAlgebra.mul!(Y::AbstractMatrix, G::Gramian, X::AbstractMatrix, α::Real = 1, β::Real = 0)
+    Y .*= β
+    @threads for j in 1:size(Y, 2)
+        for i in 1:size(Y, 1)
+            @simd for k in 1:size(X, 1)
+                @inbounds Y[i, j] += α * G[i, k] * X[k, j]
+            end
+        end
+    end
+    return Y
+end
+
 # parallel matrix instantiation
 function Base.Matrix(G::Gramian)
     n, m = size(G)
     M = Matrix{eltype(G)}(undef, n, m)
-    @threads for i in 1:n
-        for j in 1:m
-            M[i, j] = G[i, j]
+    Matrix!(M, G)
+end
+function Matrix!(M::AbstractMatrix, G)
+    @threads for j in 1:size(G, 2)
+        @simd for i in 1:size(G, 1)
+            @inbounds M[i, j] = G[i, j]
         end
     end
     return M
