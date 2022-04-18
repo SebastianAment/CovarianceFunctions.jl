@@ -17,7 +17,7 @@ end
 const BlockGramian = BlockFactorization{<:Number, <:Gramian}
 
 function Gramian(k, x::AbstractVector, y::AbstractVector = x)
-    T = typeof(k(x[1], y[1])) # if we can't directly infer output type, evaluate
+    T = gramian_eltype(k, x, y)
     Gramian{T, typeof(k), typeof(x), typeof(y)}(k, x, y)
 end
 # with euclidean dot product
@@ -27,6 +27,12 @@ Base.size(K::Gramian) = (length(K.x), length(K.y))
 Base.eltype(G::Gramian{T}) where {T} = T
 # size of an element of a matrix of matrices
 elsize(G::Gramian) = size(G[1, 1])
+elsize(G::Gramian{<:Number}) = ()
+function gramian_eltype(k::MercerKernel, x, y)
+    promote_type(eltype(k), eltype(eltype(x)), eltype(eltype(y)))
+end
+gramian_eltype(k, x, y) = typeof(k(x[1], y[1])) # default to evaluation
+
 
 # indexing
 # NOTE: @inline helps increase mvm performance by 50%
@@ -220,11 +226,17 @@ function BlockFactorizations.blockmul!(y::AbstractVecOfVecOrMat, G::Gramian, x::
     return y
 end
 
+# IDEA: @inline?
 function evaluate_block!(Gij, G::Gramian, i::Int, j::Int, T = input_trait(G.k))
     evaluate_block!(Gij, G.k, G.x[i], G.y[j], T)
 end
 
+# if target is number, just evaluate the gramian
+function evaluate_block!(Gij::Number, G::Gramian, i::Int, j::Int, T = input_trait(G.k))
+    G[i, j]
+end
+
 # fallback
-function evaluate_block!(Gij, k, x, y, T = input_trait(G.k))
+function evaluate_block!(Gij, k, x, y, T = input_trait(k))
     k(x, y)
 end

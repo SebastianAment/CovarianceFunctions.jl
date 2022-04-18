@@ -1,9 +1,10 @@
 ################################################################################
+# TODO: replace this by making kernels @functor from Functors.jl
 # this section automates the construction of parameter-dependent composite kernels
 # parameters function returns either scalar or recursive vcat of parameter vectors
 # useful for optimization algorithms which require the parameters in vector form
 parameters(::Any) = []
-parameters(::AbstractKernel{T}) where {T} = zeros(T, 0)
+parameters(::AbstractKernel{T}) where {T} = T == Union{} ? zeros(0) : zeros(T, 0)
 nparameters(::Any) = 0
 
 # checks if θ has the correct number of parameters to initialize a kernel of typeof(k)

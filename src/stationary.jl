@@ -33,7 +33,7 @@ nparameters(::Constant) = 1
 #################### standard exponentiated quadratic kernel ###################
 struct ExponentiatedQuadratic{T} <: IsotropicKernel{T} end
 const EQ = ExponentiatedQuadratic
-EQ() = EQ{Float64}()
+EQ() = EQ{Union{}}() # defaults to "bottom" type since it doesn't have any parameters
 
 (k::EQ)(r::Number) = exp(-r^2/2)
 
@@ -53,7 +53,7 @@ nparameters(::RQ) = 1
 ########################### exponential kernel #################################
 struct Exponential{T} <: IsotropicKernel{T} end
 const Exp = Exponential
-Exp() = Exp{Float64}()
+Exp() = Exp{Union{}}()
 
 (k::Exp)(r::Number) = exp(-r)
 
@@ -72,10 +72,13 @@ nparameters(::γExp) = 1
 ########################### white noise kernel #################################
 struct Delta{T} <: IsotropicKernel{T} end
 const δ = Delta
-δ() = δ{Float64}()
+δ() = δ{Union{}}()
 
 (k::δ)(r) = all(iszero, r) ? one(eltype(r)) : zero(eltype(r))
-
+function (k::δ)(x, y)
+    T = promote_type(eltype(x), eltype(y))
+    (x == y) ? one(T) : zero(T) # IDEA: if we checked (x === y) could incorporate noise variance for vector inputs -> EquivDelta?
+end
 ############################ Matern kernel #####################################
 # IDEA: use rational types to dispatch to MaternP evaluation, i.e. 5//2 -> MaternP(3)
 # seems k/2 are representable exactly in floating point?
@@ -104,7 +107,7 @@ struct MaternP{T} <: IsotropicKernel{T}
     MaternP{T}(p::Int) where T = 0 ≤ p ? new(p) : throw(DomainError("p = $p is negative"))
 end
 
-MaternP(p::Int = 0) = MaternP{Float64}(p)
+MaternP(p::Int = 0) = MaternP{Union{}}(p)
 MaternP(k::Matern) = MaternP(floor(Int, k.ν)) # project Matern to closest MaternP
 
 function (k::MaternP)(r::Number)
@@ -141,11 +144,11 @@ const SM = SpectralMixture
 ############################ Cauchy Kernel #####################################
 # there is something else in the literature with the same name ...
 struct Cauchy{T} <: IsotropicKernel{T} end
-Cauchy() = Cauchy{Float64}()
-(k::Cauchy)(r::Number) =  inv(1+r^2) # π is not necessary, we are not normalizing
+Cauchy() = Cauchy{Union{}}()
+(k::Cauchy)(r::Number) = inv(1+r^2) # π is not necessary, we are not normalizing
 
 # for spectroscopy
-PseudoVoigt(α::T) where T<:Real = α*EQ{T}() + (1-α)*Cauchy{T}()
+PseudoVoigt(α) = α*EQ() + (1-α)*Cauchy()
 
 ###################### Inverse Multi-Quadratic  ################################
 # seems formally similar to Cauchy, Cauchy is equal to power of IMQ
