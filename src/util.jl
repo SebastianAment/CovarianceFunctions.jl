@@ -149,8 +149,32 @@ function isstationary(k::AbstractKernel, x::AbstractVector)
 end
 
 ######################### perfect shuffle matrices #############################
+# lazy representation of perfect shuffle matrices
+# # X is n by m
+# S::PerfectShuffle will perform S*vec(X) = vec(X')
+struct PerfectShuffle <: AbstractMatrix{Bool}
+    n::Int
+    m::Int
+end
+
+Base.size(S::PerfectShuffle) = (n*m, n*m)
+Base.size(S::PerfectShuffle, i::Int) = 0 < i ≤ 2 ? n*m : 1
+
+SparseArrays.SparseMatrixCSC(S::PerfectShuffle) = perfect_shuffle(S.n, S.m)
+function LinearAlgebra.mul!(b::AbstractVector, S::PerfectShuffle, a::AbstractVector, α::Number = 1, β::Number = 0)
+    length(b) == length(a) == size(S, 1) || throw(DimensionMismatch())
+    A, B = reshape(a, S.n, S.m), reshape(b, S.n, S.m)
+    if β == 0
+        @. B = α * A'
+    else
+        @. B = α * A' + β * B
+    end
+    return b
+end
+Base.:*(S::PerfectShuffle, a::AbstractVector) = mul!(zero(a), S, a)
+
 function perfect_shuffle(n::Int)
-    S = spzeros(n^2, n^2)
+    S = spzeros(Bool, n^2, n^2)
     for i in 1:n, j in 1:n
         S[j+n*(i-1), i+n*(j-1)] = 1
     end
@@ -160,7 +184,7 @@ end
 # X is n by m
 # S will perform S*vec(X) = vec(X')
 function perfect_shuffle(n::Int, m::Int)
-    S = spzeros(n*m, n*m)
+    S = spzeros(Bool, n*m, n*m)
     for i in 1:n, j in 1:m
         S[j+m*(i-1), i+n*(j-1)] = 1
     end
@@ -169,7 +193,7 @@ end
 
 # exchange matrix (anti-diagonal identity matrix)
 function exchange_matrix(r::Int)
-    E = spzeros(r, r)
+    E = spzeros(Bool, r, r)
     for i in 1:r
         E[r-i+1, i] = 1
     end
@@ -181,6 +205,7 @@ end
 # end
 
 # computes all products of subsets of length(x)-1 elements of x and stores them in x
+# useful for gradient product kernel structure
 function leave_one_out_products!(x::AbstractArray)
     nz = sum(iszero, x)
     if nz == 0
