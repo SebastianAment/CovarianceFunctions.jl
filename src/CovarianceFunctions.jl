@@ -54,12 +54,14 @@ include("mercer.jl") # general mercer kernels
 include("properties.jl")
 include("gramian.jl")
 include("sparse.jl")
-include("barneshut.jl")
+include("barneshut.jl") # fast MVM algorithm for isotropic-kernel Gramians
+include("taylor.jl")
 
 # including multi-output kernels
 include("gradient.jl")
 include("gradient_algebra.jl")
 include("hessian.jl")
+# include("taylor_gradient.jl") # fast MVM algorithm for isotropic GradientKernel Gramians
 include("separable.jl")
 
 end # CovarianceFunctions

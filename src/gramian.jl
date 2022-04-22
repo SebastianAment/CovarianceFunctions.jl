@@ -14,7 +14,7 @@ struct Gramian{T, K, U<:AbstractVector, V<:AbstractVector} <: AbstractMatrix{T}
     y::V
 end
 
-const BlockGramian = BlockFactorization{<:Number, <:Gramian}
+const BlockGramian{T, M, K, X, Y} = BlockFactorization{<:T, <:Gramian{M, K, X, Y}}
 
 function Gramian(k, x::AbstractVector, y::AbstractVector = x)
     T = gramian_eltype(k, x, y)

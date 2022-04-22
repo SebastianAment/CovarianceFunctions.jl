@@ -2,7 +2,7 @@ module TestBarnesHut
 using LinearAlgebra
 using CovarianceFunctions
 using CovarianceFunctions: BarnesHutFactorization, barneshut!, vector_of_static_vectors,
-        node_sums, euclidean, GradientKernel
+        node_sums, euclidean, GradientKernel, taylor!
 using NearestNeighbors
 using NearestNeighbors: isleaf, getleft, getright, get_leaf_range
 using Test
@@ -58,7 +58,7 @@ verbose = false
     X = randn(d, n)
     x = vector_of_static_vectors(X)
     # k = (x, y) -> inv(1 + sum(abs2, x-y))
-    k = (x, y) -> CovarianceFunctions.Cauchy()(x, y)
+    k = CovarianceFunctions.Cauchy()
     # k = (x, y) -> CovarianceFunctions.Exp()(x, y) # making it anonymous to test independence to kernel types
     K = gramian(k, x)
     # k = CovarianceFunctions.EQ()
@@ -98,49 +98,54 @@ verbose = false
         err_hyp = zeros(nexp)
         err_hyp_no_split = zeros(nexp)
         err_nff = zeros(nexp)
+        err_taylor = zeros(nexp)
         theta_array = range(1e-1, 1, length = nexp)
         for (i, θ) in enumerate(theta_array)
-            barneshut!(b_bh, F, w, 1, 0, θ, split = true, use_com = true)
+            barneshut!(b_bh, F, w, 1, 0, θ, split = true)
             err[i] = norm(b - b_bh)
 
-            θ_no_split = θ # just testing out how accuracy compares against splitting barnes hut
-            barneshut!(b_bh, F, w, 1, 0, θ_no_split, split = false, use_com = true)
+            barneshut!(b_bh, F, w, 1, 0, θ, split = false)
             err_no_split[i] = norm(b - b_bh)
-
-            barneshut!(b_bh, F, w, 1, 0, θ, split = true, use_com = false) # use centers of hyperspheres
-            err_hyp[i] = norm(b - b_bh)
-
-            θ_no_split = θ
-            barneshut!(b_bh, F, w, 1, 0, θ_no_split, split = false, use_com = false) # use centers of hyperspheres
-            err_hyp_no_split[i] = norm(b - b_bh)
 
             barneshut_no_far_field!(b_bh, F, w, 1, 0, θ) # compare against pseudo barnes hut where far field = 0
             err_nff[i] = norm(b - b_bh)
+
+            taylor!(b_bh, F, w, 1, 0, θ) # compare against pseudo barnes hut where far field = 0
+            err_taylor[i] = norm(b - b_bh)
         end
 
         rel_err = err / norm(b)
         @test all(<(1e-1), rel_err[1:findlast(<(0.5), theta_array)])
         @test all(<(1e-2), rel_err[1:findlast(<(0.2), theta_array)])
 
-        # # plotting code
+        # plotting code
         # using Plots
         # plotly()
         #
         # rel_err_nff = err_nff / norm(b)
         # rel_err_no_split = err_no_split / norm(b)
-        # rel_err_hyp = err_hyp / norm(b)
-        # rel_err_hyp_no_split = err_hyp_no_split / norm(b)
+        # rel_err_taylor = err_taylor / norm(b)
         #
         # plot(theta_array, rel_err, yscale = :log10, label = "barneshut", ylabel = "relative error", xlabel = "θ")
         # plot!(theta_array, rel_err_no_split, yscale = :log10, label = "no split")
-        # plot!(theta_array, rel_err_hyp, yscale = :log10, label = "hyp") # hyp meaning using centers of hyper balls
-        # plot!(theta_array, rel_err_hyp_no_split, yscale = :log10, label = "hyp no split")
         # plot!(theta_array, rel_err_nff, yscale = :log10, label = "sparse")
+        # plot!(theta_array, rel_err_taylor, yscale = :log10, label = "taylor")
         # gui()
 
-
-
     end # testset weight vectors
+
+
+    @testset "matrix valued kernels" begin
+        d_out = 3
+        km = (x, y) -> (CovarianceFunctions.Cauchy()(x, y) * I)(d_out)
+
+        F = BarnesHutFactorization(km, x)
+        @test F isa BarnesHutFactorization
+        @test eltype(F) <: Diagonal
+        @test size(F) == (n, n)
+        @test size(F[1, 1]) == (d_out, d_out)
+    end # testset matrix valued bh
+
 end # testset
 
 end # module

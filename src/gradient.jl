@@ -12,6 +12,8 @@ end
 GradientKernel(k::AbstractKernel{T}) where T = GradientKernel{T, typeof(k)}(k)
 GradientKernel(k) = GradientKernel{Float64, typeof(k)}(k)
 input_trait(G::GradientKernel) = G.input_trait
+# gramian_eltype(G::GradientKernel) = eltype(G.k)
+Base.eltype(G::GradientKernel) = eltype(G.k)
 
 function elsize(G::Gramian{<:AbstractMatrix, <:GradientKernel}, i::Int)
     i ≤ 2 ? length(G.x[1]) : 1
@@ -110,7 +112,7 @@ end
 
 # specialization for neural network kernel
 # NOTE: assumes K is allocated with allocate_gradient_kernel
-# TODO: take care of σ constant of NN kernel (variance of bias term)
+# IDEA: take care of σ constant of NN kernel (variance of bias term)
 function gradient_kernel!(K::Woodbury, k::NeuralNetwork, x, y, ::GenericInput = GenericInput())
     Nx, Ny = dot(x, x) + 1, dot(y, y) + 1
     dxy, Nxy = dot(x, y), Nx * Ny
@@ -431,31 +433,6 @@ function value_derivative_kernel!(K::AbstractMatrix, g::ValueDerivativeKernel, x
     return K
 end
 
-# 1d-input, still necessary?
-# computes 2x2 covariance matrix associated with the function and its derivative
-# function (G::ValueGradientKernel)(x::Real, y::Real)
-#     x = float(x)
-#     x, y = promote(x, y)
-#     value_gradient_kernel!(zeros(eltype(x), (2, 2)), G, x, y)
-# end
-#
-# function value_gradient_kernel(G::ValueGradientKernel, x::Real, y::Real)
-#     value_gradient_kernel!(zeros(2, 2), G.k, x, y)
-# end
-#
-# function value_gradient_kernel!(K::AbstractMatrix, g::GradientKernel, x::Real, y::Real)
-#     function value_derivative(k, x::Real, y::Real)
-#         r = DiffResults.DiffResult(zero(y), zero(y)) # this could take pre-allocated temporary storage
-#         r = ForwardDiff.derivative!(r, z->k(z, y), x)
-#         vcat(r.value, r.derivs[1])
-#     end
-#     value = @view K[:, 1] # value of helper, i.e. original value and gradient stacked
-#     derivs = @view K[:, 2] # jacobian of helper (higher order terms)
-#     result = DiffResults.DiffResult(value, derivs)
-#     ForwardDiff.jacobian!(result, z->value_derivative(g.k, x, z[1]), [y])
-#     return K
-# end
-
 ############################# Helpers ##########################################
 # special cases that avoid problems with ForwardDiff.gradient and norm at 0
 # IDEA: could define GradientKernel on euclidean2, dot and take advantage of chain rule
@@ -466,7 +443,9 @@ end
 # derivative helper returns the function f such that f(r²) = k(x, y) where r² = sum(abs2, x-y)
 # this is required for the efficient computation of the gradient kernel matrices
 _derivative_helper(k) = throw("_derivative_helper not defined for kernel of type $(typeof(k))")
+# for kernels defining k(r) and r² > 0, we could define f(r²) = k(√r²)
 _derivative_helper(k::EQ) = f(r²) = exp(-r²/2)
+_derivative_helper(k::Cauchy) = f(r²) = inv(1 + r²)
 _derivative_helper(k::RQ) = f(r²) = inv(1 + r² / (2*k.α))^k.α
 _derivative_helper(k::Constant) = f(r²) = k.c
 _derivative_helper(k::Dot) = f(r²) = r² # r² = dot(x, y) in the case of dot product kernels
@@ -474,6 +453,15 @@ _derivative_helper(k::ExponentialDot) = f(r²) = exp(r²)
 _derivative_helper(k::Power) = f(r²) = _derivative_helper(k.k)(r²)^k.p
 function _derivative_helper(k::Lengthscale)
     f(r²) = _derivative_helper(k.k)(r²/k.l^2)
+end
+
+# NOTE: all implemented isotropic kernels are one at r = 0,
+# we exploit this fact to add a branch that is doesn't pose
+# trouble when being differentiated at 0 (because of sqrt)
+# this generic implementation is primarily useful for Matern, MaternP
+# IDEA: could rewrite stationary kernels to be
+function _derivative_helper(k::IsotropicKernel)
+    f(r²) = iszero(r²) ? one(r²) : k(sqrt(r²))
 end
 
 function _derivative_helper(k::Sum)
