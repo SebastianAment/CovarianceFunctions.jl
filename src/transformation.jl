@@ -6,22 +6,17 @@
 struct Lengthscale{T, K} <: IsotropicKernel{T}
     k::K
     l::T
-    function Lengthscale(k::IsotropicKernel, l::Real)
-        0 > l && throw(DomainError("l = $l is non-positive"))
+    function Lengthscale(k::IsotropicKernel, l)
+        all(>(0), l) || throw(DomainError("l = $l is non-positive"))
+        length(l) == 1 || throw(DimensionMismatch("lengthscale l has to has length 1"))
         S = promote_type(eltype(k), typeof(l))
         l = convert(S, l)
         new{S, typeof(k)}(k, l)
     end
 end
-(k::Lengthscale)(r²::Number) = k.k(r²/k.l^2)
-
-parameters(k::Lengthscale) = vcat(parameters(k.k), k.l)
-nparameters(k::Lengthscale) = nparameters(k.k) + 1
-function Base.similar(k::Lengthscale, θ::AbstractVector)
-    n = checklength(k, θ)
-    k = similar(k.k, @view(θ[1:n-1]))
-    Lengthscale(k, θ[n])
-end
+@functor Lengthscale
+# IDEA: for optmization with Zygote, could let k.l be vector and write sum(r² ./ k.l)
+(k::Lengthscale)(r²::Number) = k.k(r² / k.l[1]^2)
 
 ########################### Change of Input Norm  ##############################
 # apply a different norm to input radius r of an isotropic kernel
@@ -38,20 +33,10 @@ struct Normed{T, K, N} <: StationaryKernel{T}
         new{T, typeof(k), typeof(n²)}(k, n²)
     end
 end
+@functor Normed
 # WARNING: input function must be isotropic
 (m::Normed)(τ) = m.k(m.n²(τ))
 (m::Normed)(x, y) = m(difference(x, y))
-
-# WARNING: need to define parameters for norm function n (if it has any)
-parameters(k::Normed) = vcat(parameters(k.k), parameters(k.n²))
-nparameters(k::Normed) = nparameters(k.k) + nparameters(k.n²)
-function Base.similar(k::Normed, θ::AbstractVector)
-    checklength(k, θ)
-    nk = nparameters(k.k)
-    k = similar(k.k, @view(θ[1:nk]))
-    n² = similar(k.n², @view(θ[nk+1:end]))
-    Normed(k, n²)
-end
 
 # automatic relevance determination with length scale parameters l
 function ARD(k, l::AbstractVector{<:Real})
@@ -69,6 +54,7 @@ end
 struct Periodic{T, K<:IsotropicKernel{T}} <: StationaryKernel{T}
     k::K
 end
+@functor Periodic
 # squared euclidean distance of x, y in the space (cos(x), sin(x))
 # since τ_new^2 = (cos(x) - cos(y))^2 + (sin(x) - sin(y))^2 = 4*sin((x-y)/2)^2 = 4sin(τ/2)^2
 # (p::Periodic)(x, y) = p(difference(x, y))
@@ -86,6 +72,7 @@ struct ScaledInputKernel{T, K, UT} <: AbstractKernel{T}
     k::K
     U::UT
 end
+@functor ScaledInputKernel
 ScaledInputKernel(k, U) = ScaledInputKernel{Float64}(k, U)
 ScaledInputKernel{T}(k, U) where T = ScaledInputKernel{T, typeof(k), typeof(U)}(k, U)
 (S::ScaledInputKernel)(x, y) = S.k(S.U*x, S.U*y)
@@ -112,6 +99,7 @@ struct Warped{T, K, U} <: AbstractKernel{T}
     k::K
     u::U
 end
+@functor Warped
 Warped(k, u) = Warped{Float64}(k, u)
 Warped{T}(k, u) where T = Warped{T, typeof(k), typeof(u)}(k, u)
 function Warped{T}(k, U::AbstractMatOrFac) where T
@@ -139,14 +127,7 @@ struct SymmetricKernel{T, K<:AbstractKernel} <: AbstractKernel{T}
     k::K # kernel to be symmetrized
     z::T # center
 end
-parameters(k::SymmetricKernel) = vcat(parameters(k.k), k.z)
-nparameters(k::SymmetricKernel) = nparameters(k.k) + 1
-function Base.similar(k::SymmetricKernel, θ::AbstractVector)
-    n = checklength(k, θ)
-    k = similar(k.k, @view(θ[1:n-1]))
-    SymmetricKernel(k, θ[n])
-end
-# const Sym = Symmetric
+@functor SymmetricKernel
 SymmetricKernel(k::AbstractKernel{T}) where T = SymmetricKernel(k, zero(T))
 
 # for 1D axis symmetry
@@ -161,6 +142,7 @@ struct Chained{T, F, K} <: AbstractKernel{T}
     f::F
     k::K # requires k to be a kernel function
 end
+@functor Chained
 Chained(f, k::AbstractKernel{T}) where T = Chained{T}(f, k)
 Base.:∘(f, k::AbstractKernel) = Chained(f, k)
 
@@ -175,8 +157,7 @@ struct VerticalRescaling{T, K<:AbstractKernel{T}, F} <: AbstractKernel{T}
     k::K
     f::F
 end
-parameters(k::VerticalRescaling) = vcat(parameters(k.k), parameters(k.f))
-nparameters(k::VerticalRescaling) = nparameters(k.k) + nparameters(k.f)
+@functor VerticalRescaling
 
 (k::VerticalRescaling)(x, y) = k.f(x) * k.k(x, y) * k.f(y)
 # preserve structure if k.k is stationary and x, y are regular grids,
