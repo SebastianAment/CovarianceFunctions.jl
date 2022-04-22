@@ -15,11 +15,8 @@ function taylor!(b::AbstractVector, F::BarnesHutFactorization{<:Number}, w::Abst
     else
         @. b *= β
     end
-    f0 = _derivative_helper(F.k)
-    f1(r²::Real) = ForwardDiff.derivative(f0, r²)
-    f_orders = (f0, f1)
-    # or functional form: f_orders(r) = value_derivative(f0, r)
 
+    f_orders(r²) = value_derivative(F.k, r²)
     sums_w = node_sums(w, F.Tree) # IDEA: could pre-allocate
     sums_w_r = weighted_node_sums(F.y, w, F.Tree)
     centers = use_com ? compute_centers_of_mass(F, w) : get_hyper_centers(F)
@@ -34,8 +31,6 @@ function taylor!(b::AbstractVector, F::BarnesHutFactorization{<:Number}, w::Abst
 
     return b
 end
-
-# k_orders returns tuple of kernel derivatives up to pth order
 
 # uses taylor expansion as approximation (identical with bh_recursion if center is center of mass)
 function taylor_recursion(index, k, f_orders, xi, y::AbstractVector, w::AbstractVector,
@@ -53,9 +48,9 @@ function taylor_recursion(index, k, f_orders, xi, y::AbstractVector, w::Abstract
     elseif h.r < θ * euclidean(xi, centers[index]) # compress
         ri = difference(xi, centers[index])
         sum_abs2_ri = sum(abs2, ri)
-        f0, f1 = f_orders # contains first and second order derivative evaluation
-        value = f0(sum_abs2_ri) * sums_w[index]
-        first_order = -2*f1(sum_abs2_ri) * dot(ri, sums_w_r[index])
+        f0, f1 = f_orders(sum_abs2_ri) # contains first and second order derivative evaluation
+        value = f0 * sums_w[index]
+        first_order = -2*f1 * dot(ri, sums_w_r[index])
         # second_order ...
         return value + first_order
 

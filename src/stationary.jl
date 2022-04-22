@@ -4,8 +4,17 @@
 # x, y inputs
 # τ = x-y difference of inputs
 # r = norm(x-y) norm of τ
-(k::MercerKernel)(x, y) = k(norm(difference(x, y))) # if the two argument signature is not defined, default to stationary
-(k::MercerKernel)(r) = k(norm(r)) # if only the scalar argument form is defined, must be isotropic
+# r² = r^2
+# (k::MercerKernel)(x, y) = k(norm(difference(x, y))) # if the two argument signature is not defined, default to stationary
+# (k::MercerKernel)(r) = k(norm(r)) # if only the scalar argument form is defined, must be isotropic
+
+# IDEA: to work with GradientKernel AD without need of _derivative_helper, could redefine this:
+# (k::MercerKernel)(x, y) = k(euclidean2(x, y)) # if the two argument signature is not defined, default to isotropic
+# (k::MercerKernel)(r) = k(sum(abs2, r)) # if only the scalar argument form is defined, must be isotropic
+
+(k::StationaryKernel)(x, y) = k(difference(x, y)) # if the two argument signature is not defined, default to stationary
+(k::IsotropicKernel)(x, y) = k(euclidean2(x, y)) # if the two argument signature is not defined, default to isotropic
+(k::IsotropicKernel)(τ) = k(sum(abs2, τ)) # if only the scalar argument form is defined, must be isotropic
 
 ############################# constant kernel ##################################
 # can be used to rescale existing kernels
@@ -27,7 +36,7 @@ nparameters(::Constant) = 1
 
 # should type of constant field and r agree? what promotion is necessary?
 # do we need the isotropic/ stationary evaluation, if we overwrite the mercer one?
-(k::Constant)(r) = k.c # stationary / isotropic
+(k::Constant)(r²) = k.c # stationary / isotropic
 (k::Constant)(x, y) = k.c # mercer
 
 #################### standard exponentiated quadratic kernel ###################
@@ -35,7 +44,7 @@ struct ExponentiatedQuadratic{T} <: IsotropicKernel{T} end
 const EQ = ExponentiatedQuadratic
 EQ() = EQ{Union{}}() # defaults to "bottom" type since it doesn't have any parameters
 
-(k::EQ)(r::Number) = exp(-r^2/2)
+(k::EQ)(r²::Number) = exp(-r²/2)
 
 ########################## rational quadratic kernel ###########################
 struct RationalQuadratic{T} <: IsotropicKernel{T}
@@ -45,7 +54,7 @@ end
 const RQ = RationalQuadratic
 RQ(α::Real) = RQ{typeof(α)}(α)
 
-(k::RQ)(r::Number) = (1 + r^2 / (2*k.α))^-k.α
+(k::RQ)(r²::Number) = (1 + r² / (2*k.α))^-k.α
 
 parameters(k::RQ) = [k.α]
 nparameters(::RQ) = 1
@@ -55,7 +64,7 @@ struct Exponential{T} <: IsotropicKernel{T} end
 const Exp = Exponential
 Exp() = Exp{Union{}}()
 
-(k::Exp)(r::Number) = exp(-r)
+(k::Exp)(r²::Number) = exp(-sqrt(r²))
 
 ############################ γ-exponential kernel ##############################
 struct GammaExponential{T<:Real} <: IsotropicKernel{T}
@@ -65,7 +74,7 @@ end
 const γExp = GammaExponential
 γExp(γ::T) where T = γExp{T}(γ)
 
-(k::γExp)(r::Number) = exp(-r^k.γ / 2)
+(k::γExp)(r²::Number) = exp(-r²^(k.γ/2) / 2)
 parameters(k::γExp) = [k.γ]
 nparameters(::γExp) = 1
 
@@ -74,7 +83,7 @@ struct Delta{T} <: IsotropicKernel{T} end
 const δ = Delta
 δ() = δ{Union{}}()
 
-(k::δ)(r) = all(iszero, r) ? one(eltype(r)) : zero(eltype(r))
+(k::δ)(r²) = all(iszero, r²) ? one(eltype(r²)) : zero(eltype(r²))
 function (k::δ)(x, y)
     T = promote_type(eltype(x), eltype(y))
     (x == y) ? one(T) : zero(T) # IDEA: if we checked (x === y) could incorporate noise variance for vector inputs -> EquivDelta?
@@ -91,12 +100,12 @@ parameters(k::Matern) = [k.ν]
 nparameters(::Matern) = 1
 
 # IDEA: could have value type argument to dispatch p parameterization
-function (k::Matern)(r::Number)
-    if r ≈ 0
-        one(r)
+function (k::Matern)(r²::Number)
+    if iszero(r²) # helps with ForwardDiff-differentiability at zero
+        one(r²)
     else
         ν = k.ν
-        r *= sqrt(2ν)
+        r = sqrt(2ν*r²)
         2^(1-ν) / gamma(ν) * r^ν * besselk(ν, r)
     end
 end
@@ -110,14 +119,18 @@ end
 MaternP(p::Int = 0) = MaternP{Union{}}(p)
 MaternP(k::Matern) = MaternP(floor(Int, k.ν)) # project Matern to closest MaternP
 
-function (k::MaternP)(r::Number)
-    p = k.p
-    val = zero(r)
-    r *= sqrt(2p+1)
-    for i in 0:p
-        val += (factorial(p+i)/(factorial(i)*factorial(p-i))) * (2r)^(p-i) # putting @fastmath here leads to NaN with ForwardDiff
+function (k::MaternP)(r²::Number)
+    if iszero(r²) # helps with ForwardDiff-differentiability at zero
+        return one(r²)
+    else
+        p = k.p
+        val = zero(r²)
+        r = sqrt((2p+1)*r²)
+        for i in 0:p
+            val += (factorial(p+i)/(factorial(i)*factorial(p-i))) * (2r)^(p-i) # putting @fastmath here leads to NaN with ForwardDiff
+        end
+        return val *= exp(-r) * (factorial(p)/factorial(2p))
     end
-    val *= exp(-r) * (factorial(p)/factorial(2p))
 end
 
 ########################### cosine kernel ######################################
@@ -129,8 +142,10 @@ struct CosineKernel{T, V<:Union{T, AbstractVector{T}}} <: StationaryKernel{T}
 end
 const Cosine = CosineKernel
 # IDEA: trig-identity -> low-rank gramian
-(k::CosineKernel)(r) = cos(2π * dot(k.μ, r))
-(k::CosineKernel{<:Real, <:Real})(r) = cos(2π * k.μ * sum(r))
+# NOTE: this is the only stationary non-isotropic kernel so far
+(k::CosineKernel)(τ) = cos(2π * dot(k.μ, τ))
+(k::CosineKernel)(x, y) = k(difference(x, y))
+(k::CosineKernel{<:Real, <:Real})(τ) = cos(2π * k.μ * sum(τ))
 
 parameters(k::CosineKernel) = k.μ isa Real ? [k.μ] : k.μ
 nparameters(k::CosineKernel) = length(k.μ)
@@ -145,7 +160,7 @@ const SM = SpectralMixture
 # there is something else in the literature with the same name ...
 struct Cauchy{T} <: IsotropicKernel{T} end
 Cauchy() = Cauchy{Union{}}()
-(k::Cauchy)(r::Number) = inv(1+r^2) # π is not necessary, we are not normalizing
+(k::Cauchy)(r²::Number) = inv(1+r²) # π is not necessary, we are not normalizing
 
 # for spectroscopy
 PseudoVoigt(α) = α*EQ() + (1-α)*Cauchy()
@@ -155,4 +170,4 @@ PseudoVoigt(α) = α*EQ() + (1-α)*Cauchy()
 struct InverseMultiQuadratic{T} <: IsotropicKernel{T}
     c::T
 end
-(k::InverseMultiQuadratic)(r::Number) = 1/√(r^2 + k.c^2)
+(k::InverseMultiQuadratic)(r²::Number) = 1/√(r² + k.c^2)

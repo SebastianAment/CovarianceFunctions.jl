@@ -58,9 +58,8 @@ end
 
 # NOTE: assumes K is allocated with allocate_gradient_kernel
 function gradient_kernel!(K::Woodbury, k, x::AbstractVector, y::AbstractVector, ::DotProductInput)
-    f = _derivative_helper(k)
     d² = dot(x, y)
-    k1, k2 = derivative_laplacian(f, d²)
+    k1, k2 = derivative_laplacian(k, d²)
     @. K.A.diag = k1
     @. K.U = y
     @. K.C = k2
@@ -81,11 +80,10 @@ end
 
 # NOTE: assumes K is allocated with allocate_gradient_kernel
 function gradient_kernel!(K::Woodbury, k, x::AbstractVector, y::AbstractVector, ::IsotropicInput)
-    f = _derivative_helper(k)
     r = K.U
     @. r = x - y
     d² = sum(abs2, r)
-    k1, k2 = derivative_laplacian(f, d²)
+    k1, k2 = derivative_laplacian(k, d²)
     @. K.A.diag = -2k1
     K.C[1, 1] = -4k2
     return K
@@ -369,9 +367,8 @@ function value_gradient_kernel!(K::DerivativeKernelElement, k, x::AbstractVector
 end
 
 function value_gradient_kernel!(K::DerivativeKernelElement, k, x::AbstractVector, y::AbstractVector, T::DotProductInput)
-    f = _derivative_helper(k)
     xy = dot(x, y)
-    k0, k1 = value_derivative(f, xy)
+    k0, k1 = value_derivative(k, xy)
     K.value_value = k0
     @. K.value_gradient = k1*x # ForwardDiff.gradient(z->k(x, z), y)'
     @. K.gradient_value = k1*y # ForwardDiff.gradient(z->k(z, y), x)
@@ -380,11 +377,10 @@ function value_gradient_kernel!(K::DerivativeKernelElement, k, x::AbstractVector
 end
 
 function value_gradient_kernel!(K::DerivativeKernelElement, k, x::AbstractVector, y::AbstractVector, T::IsotropicInput)
-    f = _derivative_helper(k)
     r = K.gradient_value
     @. r = x - y
     d² = sum(abs2, r)
-    k0, k1 = value_derivative(f, d²)
+    k0, k1 = value_derivative(k, d²)
     K.value_value = k0
     @. K.value_gradient = r
     @. K.value_gradient *= -2k1 # ForwardDiff.gradient(z->k(x, z), y)'
@@ -434,46 +430,6 @@ function value_derivative_kernel!(K::AbstractMatrix, g::ValueDerivativeKernel, x
 end
 
 ############################# Helpers ##########################################
-# special cases that avoid problems with ForwardDiff.gradient and norm at 0
-# IDEA: could define GradientKernel on euclidean2, dot and take advantage of chain rule
-(k::EQ)(x, y) = exp(-euclidean2(x, y)/2)
-(k::RQ)(x, y) = (1 + euclidean2(x, y) / (2*k.α))^-k.α
-# (k::Lengthscale)(x, y) = k.k(euclidean2(x, y)/2)
-
-# derivative helper returns the function f such that f(r²) = k(x, y) where r² = sum(abs2, x-y)
-# this is required for the efficient computation of the gradient kernel matrices
-_derivative_helper(k) = throw("_derivative_helper not defined for kernel of type $(typeof(k))")
-# for kernels defining k(r) and r² > 0, we could define f(r²) = k(√r²)
-_derivative_helper(k::EQ) = f(r²) = exp(-r²/2)
-_derivative_helper(k::Cauchy) = f(r²) = inv(1 + r²)
-_derivative_helper(k::RQ) = f(r²) = inv(1 + r² / (2*k.α))^k.α
-_derivative_helper(k::Constant) = f(r²) = k.c
-_derivative_helper(k::Dot) = f(r²) = r² # r² = dot(x, y) in the case of dot product kernels
-_derivative_helper(k::ExponentialDot) = f(r²) = exp(r²)
-_derivative_helper(k::Power) = f(r²) = _derivative_helper(k.k)(r²)^k.p
-function _derivative_helper(k::Lengthscale)
-    f(r²) = _derivative_helper(k.k)(r²/k.l^2)
-end
-
-# NOTE: all implemented isotropic kernels are one at r = 0,
-# we exploit this fact to add a branch that is doesn't pose
-# trouble when being differentiated at 0 (because of sqrt)
-# this generic implementation is primarily useful for Matern, MaternP
-# IDEA: could rewrite stationary kernels to be
-function _derivative_helper(k::IsotropicKernel)
-    f(r²) = iszero(r²) ? one(r²) : k(sqrt(r²))
-end
-
-function _derivative_helper(k::Sum)
-    summands = _derivative_helper.(k.args)
-    f(r²) = sum(h->h(r²), summands)
-end
-function _derivative_helper(k::Product)
-    factors = _derivative_helper.(k.args)
-    f(r²) = prod(h->h(r²), factors)
-end
-# TODO: SeparableProduct, SeparableSum, what to do with vertical scaling?
-
 # computes value, first, and second derivatives of f at x
 function value_derivative_laplacian(f, x::Real)
     f(x), derivative_laplacian(f, x)...

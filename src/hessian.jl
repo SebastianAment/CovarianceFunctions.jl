@@ -98,8 +98,7 @@ function IsotropicHessianKernelElement(k, x, y)
     C = zeros(T, (2, 2))
 
     r² = sum(abs2, r)
-    f = _derivative_helper(k)
-    kd = derivatives(f, r², 4)[2:end] # get first to fourth derivative
+    kd = derivatives(k, r², 4)[2:end] # get first to fourth derivative
     @. kd = kd * 2^(1:4) # constant adjustment since kernels are function of r², not r²/2
 
     # Ua = zeros(T, 2)
@@ -127,8 +126,7 @@ function hessian_kernel!(K::IsotropicHessianKernelElement, k, x::AbstractVector,
     @. K.r = x-y
     @. K.rr = K.r*K.r'
     r² = sum(abs2, K.r)
-    f = _derivative_helper(k)
-    K.kd .= derivatives(f, r², 4)[2:end] # get first to fourth derivative
+    K.kd .= derivatives(k, r², 4)[2:end] # get first to fourth derivative
     @. K.kd = K.kd * 2^(1:4) # constant adjustment since kernels are function of r², not r²/2
 
     @. K.U[:, 2] = $vec(K.rr) # [vec(Id) vec(rr)], only rr changes
@@ -209,8 +207,7 @@ function DotProductHessianKernelElement(k, x, y)
     xy = dot(x, y)
     xx = x*x'
     yy = y*y'
-    f = _derivative_helper(k)
-    kd = derivatives(f, xy, 4)[2:end]
+    kd = derivatives(k, xy, 4)[2:end]
     DotProductHessianKernelElement(k, x, y, xx, yy, kd)
 end
 function Base.size(K::DotProductHessianKernelElement)
@@ -233,8 +230,7 @@ function hessian_kernel!(K::DotProductHessianKernelElement, k, x::AbstractVector
     @. K.xx = x*x'
     @. K.yy = y*y'
     xy = dot(x, y)
-    f = _derivative_helper(K.k)
-    K.kd .= derivatives(f, xy, 4)[2:end] # get first to fourth derivative
+    K.kd .= derivatives(k, xy, 4)[2:end] # get first to fourth derivative
     return K
 end
 function LinearAlgebra.mul!(b::AbstractVector, K::DotProductHessianKernelElement, a::AbstractVector,
@@ -379,8 +375,7 @@ function Base.Matrix(K::ValueGradientHessianKernelElement) #, ::DotProductInput 
     # xx = vec(x*x')
     # yy = vec(y*y')
     #
-    # f = _derivative_helper(k)
-    # kd = derivatives(f, xy, 4)[2:end] # get first to fourth derivative
+    # kd = derivatives(k, xy, 4)[2:end] # get first to fourth derivative
     #
     # B = kron(I(d), yx) + kron(yx, I(d))
     # HH = (Id2 + S) * (kd[2] * Id2 + kd[3] * B) +  kd[4] * (yy * xx')
@@ -416,8 +411,7 @@ function LinearAlgebra.mul!(b::AbstractVector, K::ValueGradientHessianKernelElem
 
     # evaluate kernel and derivatives
     k = K.k
-    f = _derivative_helper(k)
-    kd = derivatives(f, r², 4)
+    kd = derivatives(k, r², 4)
     @. kd *= 2^(0:4)
     k0, k1, k2, k3, k4 = kd
 
@@ -509,8 +503,7 @@ end
 #     # rr = vec(r*r')
 #     # r² = norm(r)^2
 #
-#     f = _derivative_helper(k)
-#     kd = derivatives(f, r², 4)[2:end] # get first to fourth derivative
+#     kd = derivatives(k, r², 4)[2:end] # get first to fourth derivative
 #     kd = @. kd * 2^(1:4) # constant adjustment
 #
 #     # value-hessian

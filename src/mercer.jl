@@ -1,9 +1,11 @@
 ########################## non-stationary kernels ##############################
-# abstract type DotProductKernel{T} <: MercerKernel{T} end
+abstract type DotProductKernel{T} <: MercerKernel{T} end
+(k::DotProductKernel)(x, y) = k(dot(x, y))
+
 ########################### dot product kernel #################################
-struct Dot{T} <: MercerKernel{T} end
+struct Dot{T} <: DotProductKernel{T} end
 Dot() = Dot{Union{}}()
-(k::Dot)(x, y) = dot(x, y)
+@inline (k::Dot)(d::Number) = d
 
 # all of the kernels below can be defined as a composition of Dot(), with other kernel modifications
 Line(σ::Real = 0.) = Dot() + σ
@@ -13,9 +15,9 @@ const Poly = Polynomial
 # exponential inner product kernel
 # can be interpreted as infinite weighted combination of polynomial kernels
 # WARNING: not well behaved for large inner products
-struct ExponentialDot{T} <: MercerKernel{T} end
+struct ExponentialDot{T} <: DotProductKernel{T} end
 ExponentialDot() = ExponentialDot{Union{}}()
-(k::ExponentialDot)(x, y) = exp(dot(x, y))
+(k::ExponentialDot)(d::Number) = exp(d)
 
 ############################# Matrix kernel ####################################
 # this could be discrete input kernel, as opposed to a matrix valued kernel

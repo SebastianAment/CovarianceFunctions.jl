@@ -13,7 +13,7 @@ struct Lengthscale{T, K} <: IsotropicKernel{T}
         new{S, typeof(k)}(k, l)
     end
 end
-(k::Lengthscale)(τ::Number) = k.k(τ/k.l)
+(k::Lengthscale)(r²::Number) = k.k(r²/k.l^2)
 
 parameters(k::Lengthscale) = vcat(parameters(k.k), k.l)
 nparameters(k::Lengthscale) = nparameters(k.k) + 1
@@ -24,54 +24,58 @@ function Base.similar(k::Lengthscale, θ::AbstractVector)
 end
 
 ########################### Change of Input Norm  ##############################
-# apply a different norm to input radius r of a stationary kernel
+# apply a different norm to input radius r of an isotropic kernel
 # special case of input transformation functional
-# TODO: make differentiable with ForwardDiff at zero!
+# NOTE: needs
 struct Normed{T, K, N} <: StationaryKernel{T}
     k::K
-    n::N # norm for r call
-    function Normed(k::AbstractKernel{T}, n) where T
-        new{T, typeof(k), typeof(n)}(k, n)
+    n²::N # norm for r call
+    function Normed(k::AbstractKernel{T}, n²) where T
+        new{T, typeof(k), typeof(n²)}(k, n²)
     end
-    function Normed(k, n)
-        T = typeof(k(n(0.)))
-        new{T, typeof(k), typeof(n)}(k, n)
+    function Normed(k, n²)
+        T = typeof(k(n²(0.)))
+        new{T, typeof(k), typeof(n²)}(k, n²)
     end
 end
 # WARNING: input function must be isotropic
-(m::Normed)(τ) = m.k(m.n(τ))
+(m::Normed)(τ) = m.k(m.n²(τ))
 (m::Normed)(x, y) = m(difference(x, y))
 
 # WARNING: need to define parameters for norm function n (if it has any)
-parameters(k::Normed) = vcat(parameters(k.k), parameters(k.n))
-nparameters(k::Normed) = nparameters(k.k) + nparameters(k.n)
+parameters(k::Normed) = vcat(parameters(k.k), parameters(k.n²))
+nparameters(k::Normed) = nparameters(k.k) + nparameters(k.n²)
 function Base.similar(k::Normed, θ::AbstractVector)
     checklength(k, θ)
     nk = nparameters(k.k)
     k = similar(k.k, @view(θ[1:nk]))
-    n = similar(k.n, @view(θ[nk+1:end]))
-    Normed(k, n)
+    n² = similar(k.n², @view(θ[nk+1:end]))
+    Normed(k, n²)
 end
 
 # automatic relevance determination with length scale parameters l
 function ARD(k, l::AbstractVector{<:Real})
-    f(x) = enorm(Diagonal(inv.(l)), x)
+    f(x) = enorm2(Diagonal(inv.(l)), x)
     Normed(k, f)
 end
 ARD(k, l::Real) = Lengthscale(k, l)
 function Energetic(k, A::AbstractMatOrFac{<:Real})
-    f(x) = enorm(A, x)
+    f(x) = enorm2(A, x)
     Normed(k, f)
 end
 ############################ periodic kernel ###################################
 # derived by David MacKay
 # input has to be 1D stationary or isotropic
-struct Periodic{T, K<:StationaryKernel{T}} <: IsotropicKernel{T}
+struct Periodic{T, K<:IsotropicKernel{T}} <: StationaryKernel{T}
     k::K
 end
 # squared euclidean distance of x, y in the space (cos(x), sin(x))
 # since τ_new^2 = (cos(x) - cos(y))^2 + (sin(x) - sin(y))^2 = 4*sin((x-y)/2)^2 = 4sin(τ/2)^2
-(p::Periodic)(τ::Number) = p.k(2sin(π*τ)) # without scaling, this is 1-periodic
+# (p::Periodic)(x, y) = p(difference(x, y))
+function (p::Periodic)(τ::Number)
+    r² = (2sin(π*τ))^2 # since isotropic kernels are called with r²
+    p.k(r²) # without scaling, this is 1-periodic
+end
 parameters(p::Periodic) = parameters(p.k)
 nparameters(p::Periodic) = nparameters(p.k)
 Base.similar(p::Periodic, θ::AbstractVector) = similar(p.k, θ)

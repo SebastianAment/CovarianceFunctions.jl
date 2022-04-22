@@ -36,6 +36,10 @@ const tol = 1e-12
     n = 16
     x = randn(T, n)
     Σ = zeros(T, (n, n))
+    r² = sum(abs2, x[1] - x[2])
+    for k in iso_k_arr
+        @test k(x[1], x[2]) ≈ k(r²)
+    end
     for (k, k_str) in zip(k_arr, k_strings)
         @testset "$k_str" begin
             Σ .= k.(x, permutedims(x))
@@ -44,7 +48,7 @@ const tol = 1e-12
         end
     end
 
-    @testset "MaternP" begin
+    @testset "Matern" begin
         # testing different inputs
         for p = 0:4
             k = MaternP(p)
@@ -63,6 +67,9 @@ const tol = 1e-12
 
         # testing differentiability
         k = MaternP(1)
+        @test derivative(k, 0) ≈ 0
+
+        k = Matern(1.5)
         @test derivative(k, 0) ≈ 0
     end
 
@@ -94,8 +101,8 @@ end
         r = randn(d)
         for (k, k_str) in zip(iso_k_arr, iso_k_strings)
             kl = Lengthscale(k, l)
-            @test kl(r) ≈ k(norm(r)/l)
-            # @test typeof(kl) <: CovarianceFunctions.IsotropicKernel
+            @test kl(r) ≈ k(sum(abs2, r)/l^2)
+            @test typeof(kl) <: CovarianceFunctions.IsotropicKernel
             @test isstationary(kl)
         end
     end
@@ -110,28 +117,28 @@ end
 
     @test kl(x, y) ≈ k(x, y)
 
-    @test norm(x-y) ≈ kl.n(x-y) # this tests Metrics
+    @test sum(abs2, x-y) ≈ kl.n²(x-y) # this tests Metrics
     c = 2
     l = c^2*l
     kl = CovarianceFunctions.ARD(k, l)
-    @test 1/c*norm(x-y) ≈ kl.n(x-y)
+    @test 1/c^2*sum(abs2, x-y) ≈ kl.n²(x-y)
 
     l = exp.(randn(d))
     w = @. sqrt(1/l)
     kl = CovarianceFunctions.ARD(k, l)
-    @test norm((x-y).*w) ≈ kl.n(x-y)
+    @test sum(abs2, (x-y).*w) ≈ kl.n²(x-y)
     xl = x .* w
     yl = y .* w
     @test kl(x, y) ≈ k(xl, yl)
 
     d = 3
     U = randn(1, d)
-    n(x) = enorm(U'U, x)
-    kl = CovarianceFunctions.Normed(k, n)
+    n²(x) = CovarianceFunctions.enorm2(U'U, x)
+    kl = CovarianceFunctions.Normed(k, n²)
     x = randn(d)
     y = randn(d)
     @test kl(x, y) ≈ k(U*x, U*y)
-    @test kl(x, y) ≈ k(sqrt((x-y)'*(U'U)*(x-y)))
+    @test kl(x, y) ≈ k((x-y)'*(U'U)*(x-y))
 
     S = U'U # LowRank(U')
     kSLR = CovarianceFunctions.Energetic(k, S)

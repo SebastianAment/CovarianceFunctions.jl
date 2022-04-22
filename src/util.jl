@@ -36,20 +36,19 @@ const AbstractVecOfVecOrMat{T} = AbstractVector{<:AbstractVecOrMat{T}}
 
 ################################################################################
 # euclidean distance
-_d2(x::Real, y::Real) = (x-y)^2
-_d2(x::Tuple) = _d2(x...)
 function euclidean2(x, y)
     length(x) == length(y) || throw(DimensionMismatch("inputs have to have the same length: $(length(x)), $(length(y))"))
     val = zero(promote_type(eltype(x), eltype(y)))
     @inbounds @simd for i in eachindex(x)
-        val += (x[i]-y[i])^2
+        val += (x[i] - y[i])^2
     end
     return val
 end
 euclidean(x, y) = sqrt(euclidean2(x, y))
 
 # energetic norm
-enorm(A::AbstractMatOrFac, x::AbstractVector) = sqrt(dot(x, A, x))
+enorm(A::AbstractMatOrFac, x::AbstractVector) = sqrt(enorm2(A, x))
+enorm2(A::AbstractMatOrFac, x::AbstractVector) = dot(x, A, x)
 
 # TODO: maybe include in and output dimension of kernel in type?
 # this makes it easier to type check admissability of input arguments
