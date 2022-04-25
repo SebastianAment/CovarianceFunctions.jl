@@ -4,6 +4,7 @@ authors = ["sebastianament"]
 version = "0.3.0"
 
 [deps]
+BesselK = "432ab697-7a72-484f-bc4a-bc531f5c819b"
 BlockFactorizations = "5c499583-5bfe-4591-9b59-c1e192d48697"
 DiffResults = "163ba53b-c6d8-5494-b064-1a9d43ac40c5"
 FillArrays = "1a297f60-69ca-5386-bcde-b61e274b549b"
@@ -16,6 +17,7 @@ NearestNeighbors = "b8a86587-4115-5ab1-83bc-aa920d37bbce"
 SparseArrays = "2f01184e-e22b-5df5-ae63-d93ebab69eaf"
 SpecialFunctions = "276daf66-3868-5448-9aa4-cd146d93841b"
 StaticArrays = "90137ffa-7385-5640-81b9-e52037218182"
+SymEngine = "123dc426-2d89-5057-bbad-38513e3affd8"
 TaylorSeries = "6aa5eb33-94cf-58f4-a9d0-e4b2c4fc25ea"
 Test = "8dfed614-e22c-5e08-85e1-65c5234f0b40"
 ToeplitzMatrices = "c751599d-da0a-543b-9d20-d0a503d91d24"

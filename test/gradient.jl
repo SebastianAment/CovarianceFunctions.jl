@@ -4,9 +4,9 @@ using LinearAlgebra
 using BlockFactorizations
 
 using CovarianceFunctions
-using CovarianceFunctions: EQ, RQ, Dot, ExponentialDot, NN, Lengthscale, input_trait,
-      GradientKernel, ValueGradientKernel, DerivativeKernel, ValueDerivativeKernel,
-      DerivativeKernelElement
+using CovarianceFunctions: EQ, RQ, Dot, ExponentialDot, NN, Matern, MaternP,
+        Lengthscale, input_trait, GradientKernel, ValueGradientKernel,
+        DerivativeKernel, ValueDerivativeKernel, DerivativeKernelElement
 
 const AbstractMatOrFac = Union{AbstractMatrix, Factorization}
 
@@ -19,7 +19,7 @@ const AbstractMatOrFac = Union{AbstractMatrix, Factorization}
     X = randn(d, n) / sqrt(d)
     ε = 1e4eps()
     @testset "GradientKernel" begin
-        kernels = [EQ(), RQ(1.), Dot()^3, ExponentialDot(), NN()]
+        kernels = [EQ(), RQ(1.), MaternP(2), Matern(2.7), Dot()^3, ExponentialDot(), NN()]
         # kernels = [EQ(), Lengthscale(EQ(), 0.1)] # at this time, test doesn't work because fallback is incorrect
         a = randn(d*n)
         b = randn(d*n)

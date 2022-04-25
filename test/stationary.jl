@@ -50,12 +50,38 @@ const tol = 1e-12
 
     @testset "Matern" begin
         # testing different inputs
-        for p = 0:4
+        for p = 0:8
             k = MaternP(p)
             Σ .= k.(x, permutedims(x))
             @test iscov(Σ, tol)
             @test isstationary(k, x)
         end
+
+        # testing against control implementation
+        # r² = x.^2
+        r² = 10.0.^(1:16) * eps()
+        p = 0
+        k = MaternP(p)
+        @test k.(r²) ≈ MaternP.(r², p)
+        for p = 2:3
+            k = MaternP(p)
+            @test k.(0) ≈ MaternP.(0, p) # evaluation at zero
+            @test k.(r²) ≈ MaternP.(r², p) # for small numbers up to O(1)
+            # testing differentiability
+            # k_naive = z->MaternP(z, p)
+            k_naive = z->Matern(z, p + 1/2)
+            dk_taylor = derivative.((k,), r²)
+            dk_naive = derivative.((k_naive,), r²)
+            #
+            @test isapprox(dk_taylor, dk_naive, atol = 1e-6)
+
+            # second order problem: naïve implementation is not as accurate anymore
+            dk_taylor = derivative.((z->derivative(k, z),), r²)
+            dk_naive = derivative.((z->derivative(k_naive, z),), r²)
+            @test isapprox(dk_taylor, dk_naive, atol = 1e-5)
+        end
+
+
         # testing constructor for invalid inputs
         @test_throws DomainError MaternP(-1)
 
@@ -65,12 +91,8 @@ const tol = 1e-12
             @test MaternP(Matern(p+1/2)) isa MaternP
         end
 
-        # testing differentiability
-        k = MaternP(1)
-        @test derivative(k, 0) ≈ 0
-
-        k = Matern(1.5)
-        @test derivative(k, 0) ≈ 0
+        # k = Matern(1.5)
+        # @test derivative(k, 0) ≈ ... # this needs to be fixed with taylor expansion
     end
 
 end

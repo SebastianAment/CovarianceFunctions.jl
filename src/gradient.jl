@@ -37,7 +37,9 @@ end
 # allocates space for gradient kernel evaluation but does not evaluate
 # separation from evaluation useful for ValueGradientKernel
 # x and y should have same length, i.e. dimensionality
-allocate_gradient_kernel(k, x, y, ::GenericInput) = zeros(length(x), length(y))
+function allocate_gradient_kernel(k, x, y, ::GenericInput)
+    zeros(gramian_eltype(k, x, y), length(x), length(y))
+end
 
 function gradient_kernel!(K::AbstractMatrix, k, x::AbstractVector, y::AbstractVector, ::GenericInput)
     value = similar(x)
@@ -49,9 +51,12 @@ function gradient_kernel!(K::AbstractMatrix, k, x::AbstractVector, y::AbstractVe
 end
 
 function allocate_gradient_kernel(k, x, y, T::DotProductInput)
-    U = reshape(zero(y), :, 1)
-    V = reshape(zero(x), :, 1)'
-    A = Diagonal(zero(x))
+    u = y isa SVector ? MVector(y) : zero(y)
+    U = reshape(u, :, 1)
+    v = x isa SVector ? MVector(x) : zero(x)
+    V = reshape(v, :, 1)'
+    a = x isa SVector ? MVector(x) : zero(x)
+    A = Diagonal(a)
     C = MMatrix{1, 1}(k(x, y))
     W = Woodbury(A, U, C, V) # needs to be separate from IsotropicInput,
 end
@@ -69,6 +74,9 @@ end
 
 function allocate_gradient_kernel(k, x, y, T::IsotropicInput)
     r = reshape(x - y, :, 1) # do these work without reshape?
+    if r isa SVector
+        r = MVector(r)
+    end
     kxy = k(x, y)
     d = length(x)
     # IDEA: have mutable Fill, since this is all we need, will save further allocations, check mutable_fill.jl in doodles
@@ -100,6 +108,8 @@ gradient_kernel!(K::Zeros, k::Constant, x, y, ::InputTrait) = K
 # specialization of gradient nn kernel, written before more general AD-implementation,
 # which obviates the need for special derivations like these
 function allocate_gradient_kernel(k::NeuralNetwork, x, y, ::GenericInput)
+    x isa SVector && (x = MVector(x))
+    y isa SVector && (y = MVector(y))
     U = hcat(x, y) # this preserves static arrays
     D = Diagonal(zero(x))
     # C = similar(x, 2, 2)

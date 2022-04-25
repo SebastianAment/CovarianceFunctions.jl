@@ -135,16 +135,16 @@ verbose = false
     end # testset weight vectors
 
 
-    @testset "matrix valued kernels" begin
-        d_out = 3
-        km = (x, y) -> (CovarianceFunctions.Cauchy()(x, y) * I)(d_out)
-
-        F = BarnesHutFactorization(km, x)
-        @test F isa BarnesHutFactorization
-        @test eltype(F) <: Diagonal
-        @test size(F) == (n, n)
-        @test size(F[1, 1]) == (d_out, d_out)
-    end # testset matrix valued bh
+    # @testset "gradient kernels" begin
+    #     k = CovarianceFunctions.Cauchy()
+    #     g = CovarianceFunctions.GradientKernel(k)
+    #
+    #     F = BarnesHutFactorization(g, x)
+    #     @test F isa BarnesHutFactorization
+    #     @test eltype(F) <: Diagonal
+    #     @test size(F) == (n, n)
+    #     @test size(F[1, 1]) == (d_out, d_out)
+    # end # testset matrix valued bh
 
 end # testset
 
