@@ -5,6 +5,7 @@ abstract type DotProductKernel{T} <: MercerKernel{T} end
 ########################### dot product kernel #################################
 struct Dot{T} <: DotProductKernel{T} end
 Dot() = Dot{Union{}}()
+@functor Dot
 @inline (k::Dot)(d::Number) = d
 
 # all of the kernels below can be defined as a composition of Dot(), with other kernel modifications
@@ -17,6 +18,7 @@ const Poly = Polynomial
 # WARNING: not well behaved for large inner products
 struct ExponentialDot{T} <: DotProductKernel{T} end
 ExponentialDot() = ExponentialDot{Union{}}()
+@functor ExponentialDot
 (k::ExponentialDot)(d::Number) = exp(d)
 
 ############################# Matrix kernel ####################################
@@ -24,11 +26,13 @@ ExponentialDot() = ExponentialDot{Union{}}()
 struct MatrixKernel{T, AT<:AbstractMatrix{T}} <: MercerKernel{T}
     A::AT
 end
+@functor MatrixKernel
 (k::MatrixKernel)(x::Integer, y::Integer) = k.A[i,j]
 
 ############################ Brownian kernel ###################################
 # has stationary increments
 struct Brownian{T} <: MercerKernel{T} end
+@functor Brownian
 Brownian() = Brownian{Union{}}()
 (k::Brownian)(x::Real, y::Real) = min(x, y)
 
@@ -41,6 +45,7 @@ struct FiniteBasis{T, B<:Union{AbstractVector, Tuple}} <: MercerKernel{T}
         new{T, typeof(basis)}(basis)
     end
 end
+@functor FiniteBasis
 FiniteBasis(basis) = FiniteBasis{Float64}(basis)
 (k::FiniteBasis)(x, y) = sum(b->b(x)*b(y), k.basis)
 
@@ -70,7 +75,7 @@ struct NeuralNetwork{T} <: MercerKernel{T}
     # TODO: inner constructor
 end
 const NN = NeuralNetwork
-
+@functor NN
 # NN{T}(σ::T = one(T)) where {T} = NN(σ)
 NN() = NN{Float64}(0.)
 

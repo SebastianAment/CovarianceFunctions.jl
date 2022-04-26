@@ -15,8 +15,6 @@ using Test
     k = CovarianceFunctions.Spectral(w, μ, l)
     @test k isa CovarianceFunctions.Product
     @test k(x[1], x[2]) isa Real
-    @test nparameters(k) == 3
-    @test parameters(k) == θ
     @test isstationary(k)
     @test isstationary(k, x)
 
@@ -27,18 +25,9 @@ using Test
     θ = [w μ l]
     θ = θ'[:]
     sm = CovarianceFunctions.SpectralMixture(w, μ, l)
-    @test nparameters(sm) == 3ns
-    @test parameters(sm) == θ
     @test isstationary(sm)
     @test isstationary(sm, x)
 
-    # similar
-    θ2 = exp.(randn(3ns))
-    sm2 = similar(sm, θ2)
-    @test sm2 isa typeof(sm)
-    @test parameters(sm2) == θ2
-    using LinearAlgebra
-    K = CovarianceFunctions.gramian(sm, x)
 
     # testing periodic
     # x = -1:.01:1

@@ -5,13 +5,6 @@
 # τ = x-y difference of inputs
 # r = norm(x-y) norm of τ
 # r² = r^2
-# (k::MercerKernel)(x, y) = k(norm(difference(x, y))) # if the two argument signature is not defined, default to stationary
-# (k::MercerKernel)(r) = k(norm(r)) # if only the scalar argument form is defined, must be isotropic
-
-# IDEA: to work with GradientKernel AD without need of _derivative_helper, could redefine this:
-# (k::MercerKernel)(x, y) = k(euclidean2(x, y)) # if the two argument signature is not defined, default to isotropic
-# (k::MercerKernel)(r) = k(sum(abs2, r)) # if only the scalar argument form is defined, must be isotropic
-
 (k::StationaryKernel)(x, y) = k(difference(x, y)) # if the two argument signature is not defined, default to stationary
 (k::IsotropicKernel)(x, y) = k(euclidean2(x, y)) # if the two argument signature is not defined, default to isotropic
 (k::IsotropicKernel)(τ) = k(sum(abs2, τ)) # if only the scalar argument form is defined, must be isotropic
@@ -28,11 +21,11 @@ struct Constant{T} <: IsotropicKernel{T}
         new{typeof(c)}(c)
     end
 end
+@functor Constant
+
 # isisotropic(::Constant) = true
 # ismercer(k::Constant) = ispsd(k.c)
 # Constant(c) = Constant{typeof(c)}(c)
-parameters(k::Constant) = [k.c]
-nparameters(::Constant) = 1
 
 # should type of constant field and r agree? what promotion is necessary?
 # do we need the isotropic/ stationary evaluation, if we overwrite the mercer one?
@@ -42,8 +35,8 @@ nparameters(::Constant) = 1
 #################### standard exponentiated quadratic kernel ###################
 struct ExponentiatedQuadratic{T} <: IsotropicKernel{T} end
 const EQ = ExponentiatedQuadratic
+@functor EQ
 EQ() = EQ{Union{}}() # defaults to "bottom" type since it doesn't have any parameters
-
 (k::EQ)(r²::Number) = exp(-r²/2)
 
 ########################## rational quadratic kernel ###########################
@@ -52,6 +45,7 @@ struct RationalQuadratic{T} <: IsotropicKernel{T}
     RationalQuadratic{T}(α) where T = (0 < α) ? new(α) : throw(DomainError("α not positive"))
 end
 const RQ = RationalQuadratic
+@functor RQ
 RQ(α::Real) = RQ{typeof(α)}(α)
 
 (k::RQ)(r²::Number) = (1 + r² / (2*k.α))^-k.α
@@ -72,14 +66,14 @@ struct GammaExponential{T<:Real} <: IsotropicKernel{T}
     GammaExponential{T}(γ) where {T} = (0 ≤ γ ≤ 2) ? new(γ) : throw(DomainError("γ not in [0,2]"))
 end
 const γExp = GammaExponential
+@functor γExp
 γExp(γ::T) where T = γExp{T}(γ)
 
 (k::γExp)(r²::Number) = exp(-r²^(k.γ/2) / 2)
-parameters(k::γExp) = [k.γ]
-nparameters(::γExp) = 1
 
 ########################### white noise kernel #################################
 struct Delta{T} <: IsotropicKernel{T} end
+@functor Delta
 const δ = Delta
 δ() = δ{Union{}}()
 
@@ -95,9 +89,8 @@ struct Matern{T} <: IsotropicKernel{T}
     ν::T
     Matern{T}(ν) where T = (0 < ν) ? new(ν) : throw(DomainError("ν = $ν is negative"))
 end
+@functor Matern
 Matern(ν::T) where {T} = Matern{T}(ν)
-parameters(k::Matern) = [k.ν]
-nparameters(::Matern) = 1
 
 (k::Matern)(r²::Number) = Matern(r², k.ν)
 
@@ -205,14 +198,13 @@ struct CosineKernel{T, V<:Union{T, AbstractVector{T}}} <: StationaryKernel{T}
     μ::V
 end
 const Cosine = CosineKernel
+@functor Cosine
+
 # IDEA: trig-identity -> low-rank gramian
 # NOTE: this is the only stationary non-isotropic kernel so far
 (k::CosineKernel)(τ) = cos(2π * dot(k.μ, τ))
 (k::CosineKernel)(x, y) = k(difference(x, y))
 (k::CosineKernel{<:Real, <:Real})(τ) = cos(2π * k.μ * sum(τ))
-
-parameters(k::CosineKernel) = k.μ isa Real ? [k.μ] : k.μ
-nparameters(k::CosineKernel) = length(k.μ)
 
 ####################### spectral mixture kernel ################################
 # can be seen as product kernel of Constant, Cosine, ExponentiatedQuadratic
@@ -223,6 +215,7 @@ const SM = SpectralMixture
 ############################ Cauchy Kernel #####################################
 # there is something else in the literature with the same name ...
 struct Cauchy{T} <: IsotropicKernel{T} end
+@functor Cauchy
 Cauchy() = Cauchy{Union{}}()
 (k::Cauchy)(r²::Number) = inv(1+r²) # π is not necessary, we are not normalizing
 
@@ -234,4 +227,5 @@ PseudoVoigt(α) = α*EQ() + (1-α)*Cauchy()
 struct InverseMultiQuadratic{T} <: IsotropicKernel{T}
     c::T
 end
+@functor InverseMultiQuadratic
 (k::InverseMultiQuadratic)(r²::Number) = 1/√(r² + k.c^2)

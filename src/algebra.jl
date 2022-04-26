@@ -10,6 +10,7 @@ struct Product{T, AT<:Tuple{Vararg{AbstractKernel}}} <: AbstractKernel{T}
         new{T, typeof(k)}(k)
     end
 end
+@functor Product
 (P::Product)(τ) = prod(k->k(τ), P.args) # TODO could check for isotropy here
 (P::Product)(x, y) = prod(k->k(x, y), P.args)
 # (P::Product)(x, y) = isstationary(P) ? P(difference(x, y)) : prod(k->k(x, y), P.args)
@@ -21,12 +22,6 @@ Base.:*(k::AbstractKernel...) = Product(k)
 Base.:*(c::Number, k::AbstractKernel) = Constant(c) * k
 Base.:*(k::AbstractKernel, c::Number) = Constant(c) * k
 
-parameters(k::Product) = vcat(parameters.(k.args)...)
-nparameters(k::Product) = sum(nparameters, k.args)
-function Base.similar(k::Product, θ::AbstractVector)
-    return Product(_similar_helper(k, θ))
-end
-
 ################################### Sum ########################################
 struct Sum{T, AT<:Tuple{Vararg{AbstractKernel}}} <: AbstractKernel{T}
     args::AT
@@ -35,6 +30,7 @@ struct Sum{T, AT<:Tuple{Vararg{AbstractKernel}}} <: AbstractKernel{T}
         new{T, typeof(k)}(k)
     end
 end
+@functor Sum
 (S::Sum)(τ) = sum(k->k(τ), S.args) # should only be called if S is stationary
 (S::Sum)(x, y) = sum(k->k(x, y), S.args)
 # (S::Sum)(τ) = isstationary(S) ? sum(k->k(τ), S.args) : error("One argument evaluation not possible for non-stationary kernel")
@@ -47,28 +43,15 @@ Base.:+(k::AbstractKernel...) = Sum(k)
 Base.:+(k::AbstractKernel, c::Number) = k + Constant(c)
 Base.:+(c::Number, k::AbstractKernel) = k + Constant(c)
 
-parameters(k::Sum) = vcat(parameters.(k.args)...)
-nparameters(k::Sum) = sum(nparameters, k.args)
-
-# constructs similar object to k, but with different values θ
-# overloading similar from Base
-function Base.similar(k::Sum, θ::AbstractVector)
-    return Sum(_similar_helper(k, θ))
-end
-
 ################################## Power #######################################
-struct Power{T, K<:AbstractKernel{T}} <: AbstractKernel{T}
+struct Power{T, K<:AbstractKernel{T}, PT} <: AbstractKernel{T}
     k::K
-    p::Int
+    p::PT
 end
+@functor Power
 (P::Power)(τ) = P.k(τ)^P.p
 (P::Power)(x, y) = P.k(x, y)^P.p
-Base.:^(k::AbstractKernel, p::Int) = Power(k, p)
-parameters(k::Power) = parameters(k.k)
-nparameters(k::Power) = nparameters(k.k)
-function Base.similar(k::Power, θ::AbstractVector)
-    Power(similar(k.k, θ), k.p)
-end
+Base.:^(k::AbstractKernel, p::Number) = Power(k, p)
 
 ############################ Separable Product #################################
 # product kernel, but separately evaluates component kernels on different parts of the input
@@ -79,12 +62,7 @@ struct SeparableProduct{T, K<:Tuple{Vararg{AbstractKernel}}} <: AbstractKernel{T
         new{T, typeof(k)}(k)
     end
 end
-parameters(k::SeparableProduct) = vcat(parameters.(k.args)...)
-nparameters(k::SeparableProduct) = sum(nparameters, k.args)
-
-function Base.similar(k::SeparableProduct, θ::AbstractVector)
-    SeparableProduct(_similar_helper(k, θ))
-end
+@functor SeparableProduct
 
 # both x and y have to be vectors of inputs to individual kernels
 # could also consist of tuples ... so restricting to AbstractVector might not be good
@@ -115,12 +93,7 @@ struct SeparableSum{T, K<:Tuple{Vararg{AbstractKernel}}} <: AbstractKernel{T}
         new{T, typeof(k)}(k)
     end
 end
-parameters(k::SeparableSum) = vcat(parameters.(k.args)...)
-nparameters(k::SeparableSum) = sum(nparameters, k.args)
-
-function Base.similar(k::SeparableSum, θ::AbstractVector)
-    SeparableSum(_similar_helper(k, θ))
-end
+@functor SeparableSum
 
 function (K::SeparableSum)(x::AbstractVector, y::AbstractVector)
     checklength(x, y)

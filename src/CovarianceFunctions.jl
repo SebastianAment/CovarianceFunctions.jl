@@ -13,6 +13,7 @@ using Base.Threads
 
 using ForwardDiff
 using DiffResults
+using Functors
 using SymEngine
 
 using SpecialFunctions: gamma
@@ -31,8 +32,6 @@ abstract type IsotropicKernel{T} <: StationaryKernel{T} end # ίσος + τρό�
 
 const default_tol = 1e-6 # default tolerance for matrix solves and products
 
-# IDEA: rewrite stationary kernels as function of r² to avoid AD problems
-
 # class of matrix-valued kernels for multi-output GPs
 abstract type MultiKernel{T} <: AbstractKernel{T} end # MultiKernel
 # compute the (i, j)th entry of k(x, y)
@@ -40,12 +39,10 @@ Base.getindex(K::MultiKernel, i, j) = (x, y) -> getindex(K(x, y), i, j)
 
 # first, utility functions
 include("util.jl")
+include("derivatives.jl")
 include("lazy_linear_algebra.jl") # TODO: separate out into package
 include("lazy_grid.jl")
 include("toeplitz.jl") # special functions for toeplitz matrices -> put in ToeplitzMatrices.jl
-
-include("derivatives.jl")
-include("parameters.jl")
 
 # include all types of kernels
 include("algebra.jl") # kernel operations
