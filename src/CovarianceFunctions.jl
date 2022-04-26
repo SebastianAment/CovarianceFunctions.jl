@@ -14,8 +14,10 @@ using Base.Threads
 using ForwardDiff
 using DiffResults
 using Functors
+using SymEngine
 
-using SpecialFunctions: gamma, besselk
+using SpecialFunctions: gamma
+using BesselK
 
 using KroneckerProducts
 using WoodburyFactorizations

@@ -92,38 +92,102 @@ end
 @functor Matern
 Matern(ν::T) where {T} = Matern{T}(ν)
 
-# IDEA: could have value type argument to dispatch p parameterization
-function (k::Matern)(r²::Number)
-    if iszero(r²) # helps with ForwardDiff-differentiability at zero
-        one(r²)
+(k::Matern)(r²::Number) = Matern(r², k.ν)
+
+# NOTE: this implementation only guarantees second order differentiability
+# for higher orders, need to get higher order taylor expansion
+@inline function Matern(r²::Number, ν::Real)
+    ε = eps(typeof(r²))
+    taylor_bound = (2 < ν) ? ε^(1/2) : ((1 < ν) ? ε : zero(ε))
+    if r² < taylor_bound
+        y = one(promote_type(typeof(r²), typeof(ν)))
+        if ν > 1
+            y += ν / (2*(1-ν)) * r² # first order
+        end
+        if ν > 2
+            y += ν^2 / (8*(2 - 3ν + ν^2)) * (r²)^2 # second order
+        end
+        return y
     else
-        ν = k.ν
         r = sqrt(2ν*r²)
-        2^(1-ν) / gamma(ν) * r^ν * besselk(ν, r)
+        2^(1-ν) / gamma(ν) * adbesselkxv(ν, r) # is equal to r^ν * besselk(ν, r)
     end
 end
 
 ################# Matern kernel with ν = p + 1/2 where p ∈ ℕ ###################
-struct MaternP{T} <: IsotropicKernel{T}
+struct MaternP{T, DT, CT} <: IsotropicKernel{T}
     p::Int
-    MaternP{T}(p::Int) where T = 0 ≤ p ? new(p) : throw(DomainError("p = $p is negative"))
+    derivatives::DT
+    coefficients::CT
 end
 
-MaternP(p::Int = 0) = MaternP{Union{}}(p)
+function MaternP(p::Int)
+    0 > p && throw(DomainError("p = $p is negative"))
+    d = MaternP_derivatives_at_zero(p)
+    d = float(d)
+    c = MaternP_coefficients(p)
+    c = float(c)
+    MaternP{Union{}, typeof(d), typeof(c)}(p, d, c)
+end
 MaternP(k::Matern) = MaternP(floor(Int, k.ν)) # project Matern to closest MaternP
 
+(k::MaternP)(r²::Integer) = k(float(r²))
 function (k::MaternP)(r²::Number)
-    if iszero(r²) # helps with ForwardDiff-differentiability at zero
-        return one(r²)
-    else
-        p = k.p
-        val = zero(r²)
-        r = sqrt((2p+1)*r²)
-        for i in 0:p
-            val += (factorial(p+i)/(factorial(i)*factorial(p-i))) * (2r)^(p-i) # putting @fastmath here leads to NaN with ForwardDiff
+    r² < 0 && println(r²)
+    p = k.p
+    taylor_bound = eps(typeof(r²))^(1/p)
+    if r² < taylor_bound # taylor_bound # around zero, use taylor expansion in r² to avoid singularity in derivative
+        y = one(r²)
+        r²i = r²
+        for i in 1:p # iterating over r²^i allows for automatic differentiation (even though for a regular float, it would all be zero)
+            y += k.derivatives[i] * r²i / factorial(i)
+            r²i *= r²
         end
-        return val *= exp(-r) * (factorial(p)/factorial(2p))
+        return y
+    else
+        y = zero(r²)
+        r = sqrt((2p+1)*r²)
+        ri = one(r)
+        for i in 1:p
+            y += k.coefficients[i] * ri # (2r)^(p-i)
+            ri *= 2r
+        end
+        y += ri # coefficient of (2r)^p is 1
+        y *= exp(-r) / (factorial(2p) ÷ factorial(p))
     end
+end
+
+# naïve implementation, does not allow for differentiability at zero
+# and recomputes coefficients based on factorials
+@inline function MaternP(r²::Number, p::Int)
+    val = zero(r²)
+    r = sqrt((2p+1)*r²)
+    for i in 0:p # IDEA: could table factorials and generate powers by iteration
+        val += (factorial(p+i) ÷ (factorial(p-i) * factorial(i))) * (2r)^(p-i)
+    end
+    val *= exp(-r) / (factorial(2p) ÷ factorial(p))
+end
+
+# computes derivatives of k(r²) w.r.t. r² at zero
+function MaternP_derivatives_at_zero(p::Int)
+    r² = symbols(:r²) # uses SymEngine
+    kr = MaternP(r², p)
+    d = zeros(Rational{Int64}, p)
+    for i in 1:p
+        dkr = expand(diff(kr, r²))
+        d[i] = dkr(0)
+        kr = dkr
+    end
+    return d
+end
+
+function MaternP_coefficients(p::Int)
+    coefficients = zeros(Rational{typeof(p)}, p)
+    factorial_p = factorial(p)
+    for i in 1:p
+        coefficients[i] = (binomial(p, i) * (factorial(p+i) ÷ factorial_p))
+    end
+    return reverse(coefficients)
 end
 
 ########################### cosine kernel ######################################

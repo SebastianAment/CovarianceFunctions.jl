@@ -36,6 +36,7 @@ const AbstractVecOfVecOrMat{T} = AbstractVector{<:AbstractVecOrMat{T}}
 
 ################################################################################
 # euclidean distance
+# IDEA: @inline?
 function euclidean2(x, y)
     length(x) == length(y) || throw(DimensionMismatch("inputs have to have the same length: $(length(x)), $(length(y))"))
     val = zero(promote_type(eltype(x), eltype(y)))

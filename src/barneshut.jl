@@ -4,7 +4,7 @@ const BARNES_HUT_DEFAULT_LEAFSIZE = 16
 
 # could generalize to something like HierarchicalFactorization
 # have field that determines algorithm to execute Taylor(p), BarnesHut(), FKT(p)
-struct BarnesHutFactorization{T, XT<:AbstractVector, YT<:AbstractVector, KT, TT, DT, RT} <: Factorization{T}
+struct BarnesHutFactorization{T, KT, XT<:AbstractVector, YT<:AbstractVector, TT, DT, RT} <: Factorization{T}
     k::KT # kernel function, for taylor branch, needs to be evaluable as k(r²)
     x::XT
     y::YT
@@ -31,7 +31,7 @@ function BarnesHutFactorization(k, x, y = x, D = nothing; θ::Real = 1/4, leafsi
     # i = zeros(Bool, m)
     # WT, BT = typeof(w), typeof(i)
     T = gramian_eltype(k, xs, ys)
-    BarnesHutFactorization{T, XT, YT, KT, TT, DT, RT}(k, xs, ys, Tree, D, θ) #, w, i)
+    BarnesHutFactorization{T, KT, XT, YT, TT, DT, RT}(k, xs, ys, Tree, D, θ) #, w, i)
 end
 function BarnesHutFactorization(G::Gramian, θ::Real = 1/2; leafsize::Int = BARNES_HUT_DEFAULT_LEAFSIZE)
     BarnesHutFactorization(G.k, G.x, G.y, θ, leafsize = leafsize)
