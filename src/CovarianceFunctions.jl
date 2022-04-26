@@ -32,8 +32,6 @@ abstract type IsotropicKernel{T} <: StationaryKernel{T} end # ίσος + τρό�
 
 const default_tol = 1e-6 # default tolerance for matrix solves and products
 
-# IDEA: rewrite stationary kernels as function of r² to avoid AD problems
-
 # class of matrix-valued kernels for multi-output GPs
 abstract type MultiKernel{T} <: AbstractKernel{T} end # MultiKernel
 # compute the (i, j)th entry of k(x, y)
