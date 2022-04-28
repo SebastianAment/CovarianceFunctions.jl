@@ -30,9 +30,10 @@ isdot(P::Power) = isdot(P.k)
 
 abstract type InputTrait end
 struct GenericInput <: InputTrait end
-struct IsotropicInput <: InputTrait end
-struct DotProductInput <: InputTrait end
-struct StationaryInput <: InputTrait end
+struct IsotropicInput <: InputTrait end # dependent on |r|²
+struct DotProductInput <: InputTrait end # dependent on x ⋅ y
+struct StationaryInput <: InputTrait end # dependent on r
+struct StationaryLinearFunctionalInput <: InputTrait end # dependent on c ⋅ r
 struct PeriodicInput <: InputTrait end
 
 input_trait(::T) where T = GenericInput()

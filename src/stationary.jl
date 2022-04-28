@@ -34,7 +34,7 @@ end
 
 #################### standard exponentiated quadratic kernel ###################
 struct ExponentiatedQuadratic{T} <: IsotropicKernel{T} end
-const EQ = ExponentiatedQuadratic
+const EQ{T} = ExponentiatedQuadratic{T}
 @functor EQ
 EQ() = EQ{Union{}}() # defaults to "bottom" type since it doesn't have any parameters
 (k::EQ)(r²::Number) = exp(-r²/2)
@@ -49,9 +49,6 @@ const RQ = RationalQuadratic
 RQ(α::Real) = RQ{typeof(α)}(α)
 
 (k::RQ)(r²::Number) = (1 + r² / (2*k.α))^-k.α
-
-parameters(k::RQ) = [k.α]
-nparameters(::RQ) = 1
 
 ########################### exponential kernel #################################
 struct Exponential{T} <: IsotropicKernel{T} end
@@ -133,10 +130,11 @@ MaternP(k::Matern) = MaternP(floor(Int, k.ν)) # project Matern to closest Mater
 
 (k::MaternP)(r²::Integer) = k(float(r²))
 function (k::MaternP)(r²::Number)
-    r² < 0 && println(r²)
     p = k.p
-    taylor_bound = eps(typeof(r²))^(1/p)
-    if r² < taylor_bound # taylor_bound # around zero, use taylor expansion in r² to avoid singularity in derivative
+    r²_constant = (r² isa Taylor1 ? r².coeffs[1] : r²)
+    taylor_bound = eps(typeof(r²_constant))^(1/p)
+    use_taylor = r²_constant < taylor_bound
+    if use_taylor # taylor_bound # around zero, use taylor expansion in r² to avoid singularity in derivative
         y = one(r²)
         r²i = r²
         for i in 1:p # iterating over r²^i allows for automatic differentiation (even though for a regular float, it would all be zero)
@@ -195,16 +193,19 @@ end
 # it is a valid stationary kernel,
 # because it is the inverse Fourier transform of point measure at μ (delta distribution)
 struct CosineKernel{T, V<:Union{T, AbstractVector{T}}} <: StationaryKernel{T}
-    μ::V
+    c::V
 end
 const Cosine = CosineKernel
 @functor Cosine
 
 # IDEA: trig-identity -> low-rank gramian
 # NOTE: this is the only stationary non-isotropic kernel so far
-(k::CosineKernel)(τ) = cos(2π * dot(k.μ, τ))
-(k::CosineKernel)(x, y) = k(difference(x, y))
-(k::CosineKernel{<:Real, <:Real})(τ) = cos(2π * k.μ * sum(τ))
+input_trait(::CosineKernel) = StationaryLinearFunctionalInput() # dependent on dot(c, τ)
+(k::CosineKernel)(c_dot_τ::Real) = cos(2π * c_dot_τ)
+function (k::CosineKernel)(x, y)
+    τ = difference(x, y)
+    k(dot(k.c, τ))
+end
 
 ####################### spectral mixture kernel ################################
 # can be seen as product kernel of Constant, Cosine, ExponentiatedQuadratic

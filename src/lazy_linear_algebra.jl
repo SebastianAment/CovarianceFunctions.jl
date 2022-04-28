@@ -14,11 +14,12 @@ abstract type LazyFactorization{T} <: Factorization{T} end
 # in that it calculates intermediate results, important to make use of special structure
 # observation: this is remarkably similar to the KroneckerProducts implementation
 # allow AbstractMatOrFacOrUni? will need adjustment for size function
-struct LazyMatrixProduct{T, AT<:Tuple{Vararg{AbstractMatOrFac}}, F} <: LazyFactorization{T}
+struct LazyMatrixProduct{T, AT, F} <: LazyFactorization{T}
     args::AT
     tol::F
     # temporaries
-    function LazyMatrixProduct(args::Tuple; tol::Real = default_tol)
+    # args is vector or tuple of constituent matrices
+    function LazyMatrixProduct(args; tol::Real = default_tol)
         for i in 1:length(args)-1
             size(args[i], 2) == size(args[i+1], 1) || throw(DimensionMismatch("$i"))
         end
@@ -26,7 +27,9 @@ struct LazyMatrixProduct{T, AT<:Tuple{Vararg{AbstractMatOrFac}}, F} <: LazyFacto
         new{T, typeof(args), typeof(tol)}(args, tol)
     end
 end
-LazyMatrixProduct(A::AbstractMatOrFac...; tol::Real = default_tol) = LazyMatrixProduct(A; tol = tol)
+function LazyMatrixProduct(A::AbstractMatOrFac...; tol::Real = default_tol)
+    LazyMatrixProduct([A...]; tol = tol)
+end
 
 function Base.size(L::LazyMatrixProduct, i::Int)
     if i == 1
@@ -80,16 +83,19 @@ end
 ################################################################################
 # in contrast to the AppliedMatrix in LazyArrays, this is not completely lazy
 # in that it calculates intermediate results
-struct LazyMatrixSum{T, AT<:Tuple{Vararg{AbstractMatOrFac}}, F} <: LazyFactorization{T}
+# TODO: should we have a tol field?
+struct LazyMatrixSum{T, AT, F} <: LazyFactorization{T}
     args::AT
     tol::F
-    function LazyMatrixSum(args::Tuple; tol::Real = default_tol)
+    function LazyMatrixSum(args; tol::Real = default_tol)
         all(==(size(args[1])), size.(args)) || throw(DimensionMismatch())
         T = promote_type(eltype.(args)...)
         new{T, typeof(args), typeof(tol)}(args, tol)
     end
 end
-LazyMatrixSum(A::AbstractMatOrFac...; tol::Real = default_tol) = LazyMatrixSum(A, tol = tol)
+function LazyMatrixSum(A::AbstractMatOrFac...; tol::Real = default_tol)
+    LazyMatrixSum([A...], tol = tol)
+end
 
 Base.size(L::LazyMatrixSum, i...) = size(L.args[1], i...)
 Base.adjoint(L::LazyMatrixSum) = LazyMatrixSum(adjoint.(L.args))

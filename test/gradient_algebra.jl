@@ -6,7 +6,7 @@ using BlockFactorizations
 using CovarianceFunctions
 using CovarianceFunctions: EQ, RQ, Dot, ExponentialDot, NN, GradientKernel,
         ValueGradientKernel, DerivativeKernel, ValueDerivativeKernel, input_trait,
-        LazyMatrixSum
+        LazyMatrixSum, DotProductGradientKernelElement
 
 const AbstractMatOrFac = Union{AbstractMatrix, Factorization}
 
@@ -43,7 +43,7 @@ end
     K, Kk, Kh = gramian(G, X), gramian(gk, X), gramian(gh, X)
     MK, Mkk, Mkh = Matrix(K), Matrix(Kk), Matrix(Kh)
     @test K isa BlockFactorization
-    @test K.A[1, 1] isa Woodbury # this means it correctly consolidated the sum kernel into one dot product kernel
+    @test K.A[1, 1] isa DotProductGradientKernelElement # this means it correctly consolidated the sum kernel into one dot product kernel
     @test MK ≈ Mkk + Mkh
 
     # sum of heterogeneous kernel types

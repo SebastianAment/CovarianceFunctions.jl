@@ -6,20 +6,19 @@ using BlockFactorizations
 using CovarianceFunctions
 using CovarianceFunctions: EQ, RQ, Dot, ExponentialDot, NN, Matern, MaternP,
         Lengthscale, input_trait, GradientKernel, ValueGradientKernel,
-        DerivativeKernel, ValueDerivativeKernel, DerivativeKernelElement
+        DerivativeKernel, ValueDerivativeKernel, DerivativeKernelElement, Cosine
 
 const AbstractMatOrFac = Union{AbstractMatrix, Factorization}
 
 @testset "gradient kernels" begin
     # nd test
-    n = 5
-    d = 7
-    # n = 2
-    # d = 2
+    n = 2
+    d = 5
     X = randn(d, n) / sqrt(d)
     ε = 1e4eps()
     @testset "GradientKernel" begin
-        kernels = [EQ(), RQ(1.), MaternP(2), Matern(2.7), Dot()^3, ExponentialDot(), NN()]
+        kernels = [MaternP(3), Dot()^3, Cosine(randn(d)), NN()]
+        # kernels = [EQ(), RQ(1.), MaternP(2), Matern(2.7), Dot()^3, ExponentialDot(), NN(), Cosine(randn(d))]
         # kernels = [EQ(), Lengthscale(EQ(), 0.1)] # at this time, test doesn't work because fallback is incorrect
         a = randn(d*n)
         b = randn(d*n)
@@ -37,22 +36,23 @@ const AbstractMatOrFac = Union{AbstractMatrix, Factorization}
             # create anonymous wrapper around kernel to trigger generic fallback
             k2 = (x, y)->k(x, y)
             G2 = GradientKernel(k2)
-            # G2(x[1], x[2]) # this takes centuries to precompile, maybe because of nested differentiation?
+
+            # this takes centuries to precompile, maybe because of nested differentiation?
             # not really important because it is a fallback anyway
-            K2 = CovarianceFunctions.gramian(G2, X)
+            K2 = CovarianceFunctions.gramian(G2, X) # NOTE: this is the bottleneck in test suite
             MK2 = Matrix(K2)
             @test MK ≈ MK2 # compare generic and specialized evaluation of gradient kernel
 
             # testing matrix multiply
             Kab = deepcopy(b)
-            α, β = randn(2) # trying out two-argument mul
+            α, β = randn(2) # trying out two-argument mul!
             mul!(Kab, K, a, α, β) # saves some memory, Woodbury still allocates a lot
             MKab = @. α * $*(MK, a) + β * b
             @test Kab ≈ MKab
         end
 
         # testing matrix solve
-        for k in [EQ(), RQ(1.)] # TODO: better conditioned NN kernel with bias
+        for k in kernels # TODO: better conditioned NN kernel with bias
             G = GradientKernel(k)
             K = CovarianceFunctions.gramian(G, X)
             a = randn(n*d)
@@ -64,7 +64,7 @@ const AbstractMatOrFac = Union{AbstractMatrix, Factorization}
 
     # TODO:
     @testset "ValueGradientKernel" begin
-        kernels = [Dot(), Dot()^3] #[EQ(), RQ(1.)]#, Dot(), Dot()^3, NN()]
+        kernels = [MaternP(3), Dot()^3, Cosine(randn(d))]
         a = randn((d+1)*n)
         b = randn((d+1)*n)
         for k in kernels
@@ -85,11 +85,15 @@ const AbstractMatOrFac = Union{AbstractMatrix, Factorization}
             # create anonymous wrapper around kernel to trigger generic fallback
             k2 = (x, y)->k(x, y)
             G2 = ValueGradientKernel(k2)
-            # G2(x[1], x[2]) # this takes centuries to precompile, maybe because of nested differentiation?
-            # not really important because it is a fallback anyway
-            K2 = CovarianceFunctions.gramian(G2, X)
+            K2 = CovarianceFunctions.gramian(G2, X) # NOTE: compilation here is super slow (not important for real applicaiton since it is fallback)
             MK2 = Matrix(K2)
             @test MK ≈ MK2 # compare generic and specialized evaluation of gradient kernel
+
+            # instead, compare to already tested GradientKernel
+            # K12 = K.A[1, 2]
+            # @test K12 isa DerivativeKernelElement
+            # @test K12.value_value ≈ k(X[:, 1], X[:, 2])
+            # @test Matrix(K12.gradient_gradient) ≈ Matrix(GradientKernel(k)(X[:, 1], X[:, 2]))
 
             # testing matrix multiply
             Kab = deepcopy(b)

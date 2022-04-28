@@ -5,8 +5,7 @@
 # Generally, taylor! is ~2x faster and slightly more accurate than splitting_barneshut!
 # when a signficiant degree of compression is taking place (i.e larger θ)
 function taylor!(b::AbstractVector, F::BarnesHutFactorization{<:Number}, w::AbstractVector,
-                    α::Number = 1, β::Number = 0, θ::Real = F.θ;
-                    split::Bool = true, use_com::Bool = true)
+                    α::Number = 1, β::Number = 0, θ::Real = F.θ; use_com::Bool = true)
     size(F, 2) == length(w) || throw(DimensionMismatch("length of w does not match second dimension of F: $(length(w)) ≠ $(size(F, 2))"))
     eltype(b) == promote_type(eltype(F), eltype(w)) ||
             throw(TypeError("eltype of target vector b not equal to eltype of matrix-vector product: $(eltype(b)) and $(promote_type(eltype(F), eltype(w)))"))
@@ -18,7 +17,7 @@ function taylor!(b::AbstractVector, F::BarnesHutFactorization{<:Number}, w::Abst
 
     f_orders(r²) = value_derivative(F.k, r²)
     sums_w = node_sums(w, F.Tree) # IDEA: could pre-allocate
-    sums_w_r = weighted_node_sums(F.y, w, F.Tree)
+    sums_w_r = weighted_node_sums(w, F.y, F.Tree)
     centers = use_com ? compute_centers_of_mass(F, w) : get_hyper_centers(F)
     @. sums_w_r -= sums_w * centers # need to center the moments
     @threads for i in eachindex(F.x) # exactly 4 * length(y) allocations?

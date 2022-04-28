@@ -30,7 +30,7 @@ function BarnesHutFactorization(k, x, y = x, D = nothing; θ::Real = 1/4, leafsi
     # w = zeros(length(m))
     # i = zeros(Bool, m)
     # WT, BT = typeof(w), typeof(i)
-    T = gramian_eltype(k, xs, ys)
+    T = gramian_eltype(k, xs[1], ys[1])
     BarnesHutFactorization{T, KT, XT, YT, TT, DT, RT}(k, xs, ys, Tree, D, θ) #, w, i)
 end
 function BarnesHutFactorization(G::Gramian, θ::Real = 1/2; leafsize::Int = BARNES_HUT_DEFAULT_LEAFSIZE)
@@ -49,7 +49,7 @@ function LinearAlgebra.mul!(y::AbstractVector, F::BarnesHutFactorization, x::Abs
         taylor!(y, F, x, α, β)
     end
 end
-function Base.:*(F::BarnesHutFactorization, x::AbstractVector)
+function Base.:*(F::BarnesHutFactorization{<:Number}, x::AbstractVector{<:Number})
     T = promote_type(eltype(F), eltype(x))
     y = zeros(T, size(F, 1))
     mul!(y, F, x)
@@ -148,45 +148,45 @@ end
 
 ############################# centers of mass ##################################
 # this is a weighted sum, could be generalized to incorporate node_sums
-function compute_centers_of_mass(x::AbstractVector, w::AbstractVector, T::BallTree)
+function compute_centers_of_mass(w::AbstractVector, x::AbstractVector, T::BallTree)
     D = eltype(x) <: StaticVector ? length(eltype(x)) : length(x[1]) # if x is static vector
     com = [zero(MVector{D, Float64}) for _ in 1:length(T.hyper_spheres)]
-    compute_centers_of_mass!(com, x, w, T)
+    compute_centers_of_mass!(com, w, x, T)
 end
 
 function compute_centers_of_mass(F::BarnesHutFactorization, w::AbstractVector)
-    compute_centers_of_mass(F.y, w, F.Tree)
+    compute_centers_of_mass(w, F.y, F.Tree)
 end
 
-function compute_centers_of_mass!(com::AbstractVector, x::AbstractVector, w::AbstractVector, T::BallTree)
+function compute_centers_of_mass!(com::AbstractVector, w::AbstractVector, x::AbstractVector, T::BallTree)
     abs_w = abs.(w)
-    weighted_node_sums!(com, x, abs_w, T)
+    weighted_node_sums!(com, abs_w, x, T)
     sum_w = node_sums(abs_w, T)
     ε = eps(eltype(w)) # ensuring division by zero it not a problem
     @. com ./= sum_w + ε
 end
 
-node_sums(x::AbstractVector, T::BallTree) = weighted_node_sums(x, Ones(length(x)), T)
+node_sums(x::AbstractVector, T::BallTree) = weighted_node_sums(Ones(length(x)), x, T)
 function node_sums!(sums, x::AbstractVector, T::BallTree)
-    weighted_node_sums!(sums, x, Ones(length(x)), T)
+    weighted_node_sums!(sums, Ones(length(x)), x, T)
 end
 
-function weighted_node_sums(x::AbstractVector, w::AbstractVector, T::BallTree, index::Int = 1)
+function weighted_node_sums(w::AbstractVector, x::AbstractVector, T::BallTree, index::Int = 1)
     length(x) == 0 && return zero(eltype(x))
-    sums = zeros(typeof(w[1]'x[1]), length(T.hyper_spheres))
-    weighted_node_sums!(sums, x, w, T)
+    sums = fill(zero(w[1]'x[1]), length(T.hyper_spheres))
+    weighted_node_sums!(sums, w, x, T)
 end
 
 # NOTE: x should either be vector of numbers or vector of static arrays
-function weighted_node_sums!(sums::AbstractVector, x::AbstractVector,
-                            w::AbstractVector{<:Number}, T::BallTree, index::Int = 1)
+function weighted_node_sums!(sums::AbstractVector, w::AbstractVector,
+                            x::AbstractVector, T::BallTree, index::Int = 1)
     if isleaf(T.tree_data.n_internal_nodes, index)
         i = get_leaf_range(T.tree_data, index)
         wi, xi = @views w[T.indices[i]], x[T.indices[i]]
         sums[index] = wi'xi
     else
-        task = @spawn weighted_node_sums!(sums, x, w, T, getleft(index))
-        weighted_node_sums!(sums, x, w, T, getright(index))
+        task = @spawn weighted_node_sums!(sums, w, x, T, getleft(index))
+        weighted_node_sums!(sums, w, x, T, getright(index))
         wait(task)
         sums[index] = sums[getleft(index)] + sums[getright(index)]
     end

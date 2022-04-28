@@ -17,7 +17,7 @@ end
 const BlockGramian{T, M, K, X, Y} = BlockFactorization{<:T, <:Gramian{M, K, X, Y}}
 
 function Gramian(k, x::AbstractVector, y::AbstractVector = x)
-    T = gramian_eltype(k, x, y)
+    T = gramian_eltype(k, x[1], y[1])
     Gramian{T, typeof(k), typeof(x), typeof(y)}(k, x, y)
 end
 # with euclidean dot product
@@ -31,8 +31,7 @@ elsize(G::Gramian{<:Number}) = ()
 function gramian_eltype(k::MercerKernel, x, y)
     promote_type(eltype(k), eltype(eltype(x)), eltype(eltype(y)))
 end
-gramian_eltype(k, x, y) = typeof(k(x[1], y[1])) # default to evaluation
-
+gramian_eltype(k, x, y) = typeof(k(x, y)) # default to evaluation
 
 # indexing
 # NOTE: @inline helps increase mvm performance by 50%
@@ -224,6 +223,10 @@ function BlockFactorizations.blockmul!(y::AbstractVecOfVecOrMat, G::Gramian, x::
         end
     end
     return y
+end
+
+function LinearAlgebra.mul!(y::AbstractVecOfVecOrMat, G::Gramian, x::AbstractVecOfVecOrMat, α::Real = 1, β::Real = 0)
+    BlockFactorizations.blockmul!(y, G, x, α, β)
 end
 
 # IDEA: @inline?

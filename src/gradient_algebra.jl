@@ -3,13 +3,15 @@
 # allocates space for gradient kernel evaluation but does not evaluate
 # the separation from evaluation is useful for ValueGradientKernel
 function allocate_gradient_kernel(k::Sum, x, y, ::GenericInput)
-    H = (allocate_gradient_kernel(h, x, y, input_trait(h)) for h in k.args)
-    LazyMatrixSum(H...)
+    H = [allocate_gradient_kernel(h, x, y, input_trait(h)) for h in k.args]
+    LazyMatrixSum(H)
 end
 
+# NOTE: K should be allocated with allocate_gradient_kernel(k, x, y)
 function gradient_kernel!(K::LazyMatrixSum, k::Sum, x::AbstractVector, y::AbstractVector, ::GenericInput)
-    for (h, H) in zip(k.args, K.args)
-        gradient_kernel!(H, h, x, y, input_trait(h))
+    for i in eachindex(k.args)
+        h = k.args[i]
+        K.args[i] = gradient_kernel!(K.args[i], h, x, y, input_trait(h))
     end
     return K
 end
@@ -40,7 +42,7 @@ function gradient_kernel!(W::Woodbury, k::Product, x::AbstractVector, y::Abstrac
         h, H = k.args[i], A.args[i]
         D = H.args[1]
         @. D.diag = k_j
-        gradient_kernel!(H.args[2], h, x, y, input_trait(h))
+        H.args[2] = gradient_kernel!(H.args[2], h, x, y, input_trait(h))
     end
     return W
 end
@@ -136,7 +138,7 @@ function gradient_kernel!(W::Woodbury, k::VerticalRescaling, x, y, ::GenericInpu
     @. A.args[1].diag = fx
     H = A.args[2] # LazyMatrixProduct: first and third are the diagonal scaling matrices, second is the gradient_kernel_matrix of h
     @. A.args[3].diag = fy
-    gradient_kernel!(H, h, x, y, input_trait(h))
+    A.args[2] = gradient_kernel!(H, h, x, y, input_trait(h))
     ForwardDiff.gradient!(@view(W.U[:, 1]), f, x)
     ForwardDiff.gradient!(@view(W.U[:, 2]), z->h(z, y), x)
     ForwardDiff.gradient!(@view(W.V[1, :]), f, y)
@@ -165,7 +167,7 @@ function gradient_kernel!(W::Woodbury, k::Chained, x, y, ::GenericInput)
     f1, f2 = derivative_laplacian(f, h(x, y))
     @. A.args[1].diag = f1
     H = A.args[2] # LazyMatrixProduct: first argument is diagonal scaling, second is the gradient_kernel_matrix of h
-    gradient_kernel!(H, h, x, y, input_trait(h))
+    H.A.args[2] = gradient_kernel!(H, h, x, y, input_trait(h))
     ForwardDiff.gradient!(@view(W.U[:]), z->h(z, y), x)
     ForwardDiff.gradient!(@view(W.V[1, :]), z->h(x, z), y)
     @. W.C = f2
