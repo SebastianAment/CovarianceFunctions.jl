@@ -1,4 +1,3 @@
-using ToeplitzMatrices: Circulant, SymmetricToeplitz
 # using LinearAlgebraExtensions: vecofvec
 vecofvec(A::AbstractMatrix) = [a for a in eachcol(A)] # one view allocates 64 bytes
 
@@ -20,7 +19,7 @@ function Gramian(k, x::AbstractVector, y::AbstractVector = x)
     T = gramian_eltype(k, x[1], y[1])
     Gramian{T, typeof(k), typeof(x), typeof(y)}(k, x, y)
 end
-# with euclidean dot product
+# defaults to euclidean dot product
 Gramian(x::AbstractVector, y::AbstractVector) = Gramian(Dot(), x, y)
 
 Base.size(K::Gramian) = (length(K.x), length(K.y))
@@ -45,6 +44,14 @@ function Base.getindex(G::Gramian, i::Union{AbstractArray, Colon},
                                                 j::Union{AbstractArray, Colon})
     @boundscheck checkbounds(G, i, j) # add bounds check to G
     @inbounds gramian(G.k, G.x[i], G.y[j])
+end
+
+# maintain laziness by default when adding diagonal
+function Base.:+(D::Union{Diagonal, BlockDiagonalFactorization}, G::Union{Gramian, BlockGramian})
+    LazyMatrixSum(D, G)
+end
+function Base.:+(G::Union{Gramian, BlockGramian}, D::Union{Diagonal, BlockDiagonalFactorization})
+    LazyMatrixSum(G, D)
 end
 
 # IDEA: GPU
@@ -144,14 +151,21 @@ gramian(x::AbstractVector) = gramian(x, x)
 gramian(k, x::AbstractMatrix) = gramian(k, vecofvec(x))
 gramian(k, x::AbstractMatrix, y::AbstractMatrix) = gramian(k, vecofvec(x), vecofvec(y))
 
+# if input trait is not used, ignore it
+gramian(k, x, y, ::InputTrait) = gramian(k, x, y)
+gramian(k, x, ::InputTrait) = gramian(k, x)
+
 # IDEA: gramian(k, x, y, input = input_trait(k))
 # makes it possible to take advantage of specialized implementations
 # and custom kernels k, by defining input_trait(k)
 
 # 1D stationary kernel on equi-spaced grid yields Toeplitz structure
+# works if input_trait(k) <: Union{IsotropicInput, StationaryInput}
+gramian(k, x::StepRangeLen{<:Real}) = gramian(k, x, input_trait(k))
+
 # IDEA: should this be in factorization? since dft still costs linear amount of information
 # while gramian is usually lazy and O(1) in structure construction
-function gramian(k::StationaryKernel, x::StepRangeLen{<:Real})
+function gramian(k, x::StepRangeLen{<:Real}, ::Union{IsotropicInput, StationaryInput})
     k1 = k.(x[1], x)
     SymmetricToeplitz(k1)
 end

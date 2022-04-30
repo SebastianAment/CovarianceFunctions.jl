@@ -4,7 +4,7 @@ using Test
 using LinearAlgebra
 using ToeplitzMatrices
 using CovarianceFunctions
-using CovarianceFunctions: PeriodicInput
+using CovarianceFunctions: PeriodicInput, LazyMatrixSum
 using BlockFactorizations
 
 @testset "Gramian properties" begin
@@ -33,15 +33,20 @@ using BlockFactorizations
     @test G ≈ dot.(x, x')
 
     x = randn(Float64, n)
-    k = CovarianceFunctions.EQ{Float32}()
+    k = CovarianceFunctions.EQ()
     G = gramian(k, x)
     # type promotion
-    @test typeof(k(x[1], x[1])) <: typeof(G[1,1]) # test promotion in inner constructor
-    @test typeof(k(x[1], x[1])) <: eltype(G) # test promotion in inner constructor
+    @test k(x[1], x[2]) isa typeof(G[1, 2]) # test promotion in inner constructor
+    @test k(x[1], x[2]) isa eltype(G) # test promotion in inner constructor
     x = tuple.(x, x)
     G = gramian(k, x)
-    @test typeof(k(x[1], x[1])) <: typeof(G[1,1])  # with tuples (or arrays)
-    @test typeof(k(x[1], x[1])) <: eltype(G)
+    @test k(x[1], x[2]) isa typeof(G[1,1])  # with tuples (or arrays)
+    @test k(x[1], x[2]) isa eltype(G)
+
+    # adding diagonal to Gramian is done lazily
+    D = 1e-6I(n)
+    @test D + G isa LazyMatrixSum
+    @test G + D isa LazyMatrixSum
 
     # rectangular multiply
     x = randn(n)
@@ -62,12 +67,6 @@ using BlockFactorizations
     @test size(B) == (n, p)
     @test B ≈ Matrix(G) * A
 
-
-    # TODO: MultiKernel test
-    k = (x, y) -> randn(3, 2)
-    G = gramian(k, x)
-    @test G isa BlockFactorization # testing that matrix-valued kernel returns block factorization
-    @test size(G) == (3n, 2n)
 end
 
 @testset "Gramian factorization" begin
@@ -94,15 +93,25 @@ end
     @test F isa Cholesky
     @test isapprox(Matrix(F), G, rtol = rtol)
 
-
     # testing gramian of matrix-valued anonymous kernel
-    A = randn(3, 2)
+    d = 3
+    A = randn(d, d)
     k = (x, y)->A
     G = gramian(k, x)
     GA = Matrix(G)
-    a = randn(2*n)
+    a = randn(d*n)
+    @test size(G) == (d*n, d*n)
     @test G isa BlockFactorization
     @test G*a ≈ GA*a
+
+    # adding diagonal by default maintains laziness
+    @test I(d*n) + G isa LazyMatrixSum
+    @test G + I(d*n) isa LazyMatrixSum
+
+    # same thing for block diagonal matrices
+    D = BlockFactorization(Diagonal([randn(d, d) for _ in 1:n]))
+    @test D + G isa LazyMatrixSum
+    @test G + D isa LazyMatrixSum
 end
 
 @testset "toeplitz structure" begin
@@ -112,11 +121,14 @@ end
     G = gramian(k, x)
     @test G isa SymmetricToeplitz
     @test size(G) == (n, n)
+    @test G*x ≈ Matrix(G)*x
+
     @test Matrix(G) ≈ Matrix(Gramian(k, x))
     G = gramian(k, x, PeriodicInput()) # periodic boundary conditions
     @test G isa Circulant
     @test size(G) == (n, n)
+    @test G*x ≈ Matrix(G)*x
     # @test Matrix(G) ≈ Matrix(Gramian(k, x))
-end # TODO: test solves and multiplications
+end # test solves and multiplications
 
 end # TestGramian

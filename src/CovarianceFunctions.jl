@@ -24,6 +24,8 @@ using WoodburyFactorizations
 using BlockFactorizations
 using NearestNeighbors
 using IterativeSolvers
+using ToeplitzMatrices
+using FFTW
 
 abstract type AbstractKernel{T} end
 abstract type MercerKernel{T} <: AbstractKernel{T} end

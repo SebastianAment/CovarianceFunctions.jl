@@ -43,7 +43,6 @@ end
 Base.size(L::LazyMatrixProduct) = size(L, 1), size(L, 2)
 Base.adjoint(L::LazyMatrixProduct) = LazyMatrixProduct(reverse(adjoint.(L.args)))
 issquare(A::AbstractMatOrFac) = size(A, 1) == size(A, 2)
-# allsquare(L::LazyMatrixProduct) = all(issquare, L.args)
 Base.Matrix(L::LazyMatrixProduct) = prod(Matrix, L.args)
 Base.AbstractMatrix(L::LazyMatrixProduct) = prod(AbstractMatrix, L.args)
 
@@ -71,6 +70,7 @@ function Base.:*(L::LazyMatrixProduct, X::AbstractMatrix)
     B = zeros(T, (size(L, 1), size(X, 2)))
     mul!(B, L, X)
 end
+# IDEA: this could be more memory-efficient if we knew that all matrices had the same size
 function LinearAlgebra.mul!(y::AbstractVecOrMat, L::LazyMatrixProduct, x::AbstractVecOrMat, α::Real = 1, β::Real = 0)
     z = deepcopy(x)
     for A in reverse(L.args)

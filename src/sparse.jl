@@ -47,7 +47,8 @@ end
 # reorder copies the data and puts nearby points close in memory, think about using Distance.jl for the rest of the code too
 function in_range_neighbors(x, y, r::Real, metric = Euclidean(); leafsize::Int = DEFAULT_LEAFSIZE)
     # X needs to be either matrix or vector of static vectors
-    x, y = vector_of_static_vectors(x), vector_of_static_vectors(y)
+    x = vector_of_static_vectors(x)
+    y = x === y ? x : vector_of_static_vectors(y)
     tree = BallTree(x, metric; leafsize = leafsize, reorder = true)
     inrange(tree, y, r) # plus one because we are putting in the original points as well
 end
