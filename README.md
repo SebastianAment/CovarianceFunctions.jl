@@ -16,10 +16,12 @@ using LinearAlgebra
 k = CovarianceFunctions.MaternP(2); # Matérn kernel with ν = 2.5
 d, n = 3, 16384; # generating data with large number of samples
 x = [randn(d) for _ in 1:n]; # data is vector of vectors
+
 @time K = gramian(k, x); # instantiating lazy Gramian matrix
   0.000005 seconds (1 allocation: 48 bytes)
 size(K)
   (16384, 16384)
+
 a = randn(n);
 b = zero(b);
 @time mul!(b, K, a); # multiplying with K allocates little memory
@@ -38,6 +40,7 @@ The package implements many popularly used covariance kernels.
 
 We give a list of stationary kernels
 whose implementations can be found in src/stationary.jl.
+
 1. `ExponentiatedQuadratic` or `EQ` (also known as RBF)
 2. `RationalQuadratic` or `RQ`
 3. `Exponential` or `Exp`
@@ -49,6 +52,7 @@ whose implementations can be found in src/stationary.jl.
 
 ### Non-Stationary Kernels
 The  following non-stationary kernels can be found in src/mercer.jl.
+
 9. `Dot` is the covariance functions of a linear function
 10. `Polynomial` or `Poly`
 11. `ExponentialDot`
@@ -81,6 +85,53 @@ custom_rbf(x, y) = exp(-sum(abs2, x .- y)) # custom RBF implementation
 To take advantage of some specialized structure-aware algorithms, it is prudent to let CovarianceFunctions.jl know about the input type, in this case
 ```julia
 input_trait(::typeof(custom_rbf)) = IsotropicInput()
+```
+
+## Toeplitz Structure
+
+The kernel matrix corresponding to isotropic kernel on a regular grid in one dimension exhibits a special Toeplitz structure.
+CovarianceFunctions.jl *automatically* detects this structure,
+which can be used for `O(n log(n))` multiplies and `O(n²)` direct solves.
+```julia
+using CovarianceFunctions
+using LinearAlgebra
+CovarianceFunctions.Exponential(); # exponential kernel
+n = 16384;
+x = range(-1, 1, n);
+
+@time G = gramian(k, x);
+  0.000572 seconds (3 allocations: 128.062 KiB)
+typeof(G) # the algorithm automatically recognized the Toeplitz structure
+  ToeplitzMatrices.SymmetricToeplitz{Float64}
+
+a = randn(n);
+b = zero(a);
+@time mul!(b, G, a); # matrix-vector multiplications are very with G are fast O(n log(n))
+  0.001068 seconds (57 allocations: 1.504 MiB)
+```
+
+In contrast, instantiating the matrix is much slower and memory-expensive:
+```julia
+@time Matrix(G);
+  0.393198 seconds (2 allocations: 2.000 GiB, 0.89% gc time)
+```
+
+While the fast multiplicatios can be used in conjunction with iterative solvers,
+CovarianceFunctions.jl also implements a `O(n²)` direct solver called `levinson`:
+```julia
+using CovarianceFunctions: levinson
+@time x_fast = levinson(G, b); # same as G \ b
+  0.172557 seconds (6 allocations: 384.141 KiB)
+```
+whereas naïvely, this would take two orders of magnitude longer for this problem:
+```julia
+julia> @time x_naive = Matrix(G) \ b;
+ 10.494046 seconds (8 allocations: 4.000 GiB, 1.34% gc time)
+```
+Notably, the results are equal to machine precision:
+```julia
+x_naive ≈ x_fast
+  true
 ```
 
 ## Gradient Kernels
@@ -131,6 +182,42 @@ using the `input_trait` function.
 Basic input traits amenable to specializations are `IsotropicInput`, `DotProductInput`, and  `StationaryLinearFunctionalInput`.
 Further transformations and combinations of kernels are also supported, as well as efficient `O(d²)` operations with certain Hessian kernels, in constrast to the naïve `O(d⁴)` complexity.
 The main files containing the implementation are src/gradient.jl, src/gradient_algebra.jl, and src/hessian.jl
+
+## Sparsification
+In high dimensions, kernel matrices associated with exponentially-decaying kernels are very likely sparse.
+This is because the average distance between points grows with increasing dimension.
+CovarianceFunctions.jl contains a sparsification algorithm that extends SparseArrays.jl's `sparse` function,
+guaranteeing a user-defined element-wise accuracy.
+```julia
+using CovarianceFunctions
+using SparseArrays
+
+k = CovarianceFunctions.EQ()
+d, n = 32, 16384;
+X = randn(d, n);
+G = gramian(k, X);
+
+@time S = sparse(G, 1e-6); # sparsification with 1e-6 tolerance
+  7.208343 seconds (407.54 k allocations: 73.094 MiB)
+nnz(S) # number of non-zeros in S
+  594480
+nnz(S) / n^2 # over 99% of entries are sparse
+  0.0022146105766296387
+```
+Subsequent matrix-vector multiplications with `S` are very fast:
+```julia
+@time mul!(b, S, a); # sparse multiply
+    0.000451 seconds
+@time mul!(b, G, a); # lazy dense multiply
+  0.949835 seconds (61 allocations: 5.594 KiB)
+```
+The bottleneck in the computation of `S` is NearestNeighbors.jl's `inrange` function.
+We believe that it is possible to further accelerate this computation.
+
+## Barnes-Hut
+The Barnes-Hut algorithm has its origins in accelerating gravity simulutations, but a variant of it can be applied to kernel matrices arising from more general kernels,
+allowing for an approximate matrix-vector multiply in `O(n⋅log(n)⋅d)` operations.
+CovarianceFunctions.jl contains the `BarnesHutFactorization` structure whose constructor can be called on a `Gramian` matrix and applies the fast transform whenever `*` or `mul!` is called.
 
 
 <!-- * more covariance matrix factorizations (HODLR), or approximations (SKI, Nystrom, Random Kitchen Sinks, Fast Food)
