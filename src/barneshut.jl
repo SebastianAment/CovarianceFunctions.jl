@@ -1,6 +1,7 @@
 using NearestNeighbors: TreeData, get_leaf_range, isleaf, getleft, getright
 
-const BARNES_HUT_DEFAULT_LEAFSIZE = 16
+const BARNES_HUT_LEAFSIZE = 16
+const BARNES_HUT_THETA = 1/4
 
 # could generalize to something like HierarchicalFactorization
 # have field that determines algorithm to execute Taylor(p), BarnesHut(), FKT(p)
@@ -21,7 +22,7 @@ end
 # if reorder = true, and T = BallTree(X), we have
 # X[:, T.indices[i]] = T.data[i]
 # X[:, i] == T.data[invpermute!(collect(1:length(T.data)), T.indices)][i]
-function BarnesHutFactorization(k, x, y = x, D = nothing; θ::Real = 1/4, leafsize::Int = BARNES_HUT_DEFAULT_LEAFSIZE)
+function BarnesHutFactorization(k, x, y = x, D = nothing; θ::Real = BARNES_HUT_THETA, leafsize::Int = BARNES_HUT_LEAFSIZE)
     xs = vector_of_static_vectors(x)
     ys = x === y ? xs : vector_of_static_vectors(y)
     Tree = BallTree(ys, leafsize = leafsize)
@@ -33,8 +34,8 @@ function BarnesHutFactorization(k, x, y = x, D = nothing; θ::Real = 1/4, leafsi
     T = gramian_eltype(k, xs[1], ys[1])
     BarnesHutFactorization{T, KT, XT, YT, TT, DT, RT}(k, xs, ys, Tree, D, θ) #, w, i)
 end
-function BarnesHutFactorization(G::Gramian, θ::Real = 1/2; leafsize::Int = BARNES_HUT_DEFAULT_LEAFSIZE)
-    BarnesHutFactorization(G.k, G.x, G.y, θ, leafsize = leafsize)
+function BarnesHutFactorization(G::Gramian; θ::Real = BARNES_HUT_THETA, leafsize::Int = BARNES_HUT_LEAFSIZE)
+    BarnesHutFactorization(G.k, G.x, G.y, θ = θ, leafsize = leafsize)
 end
 Base.size(F::BarnesHutFactorization) = (length(F.x), length(F.y))
 Base.size(F::BarnesHutFactorization, i::Int) = i ≤ 2 ? size(F)[i] : 1
