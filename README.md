@@ -8,14 +8,14 @@ can be used to solve linear algebraic problems arising in
 kernel methods efficiently without running out of memory.
 Further, the code automatically recognizes when certain linear algebraic structures are present and exploits them for computational efficiency, in particular for fast matrix-vector multiplications (MVMs).
 
-The package offers
+Feature highlights include
 - lazy representations of kernel matrices with `O(1)` memory footprint and efficient, parallelized MVMs.
-- `O(n²d)` exact MVMs with kernel matrices arising from **gradient observations**
+- `O(n²d)` exact MVMs with kernel matrices arising from [gradient observations](#gradient-kernels)
 in contrast to the naïve `O(n²d²)` complexity.
-- `O(n²d²)` exact MVMs with kernel matrices arising from **Hessian observations** in contrast to the naïve `O(n²d⁴)` complexity.
-- `O(n⋅log(n))` exact MVMs and `O(n²)` linear solves with isotropic kernel matrices on a uniform grid, automatically taking advantage of **Toeplitz structure**.
-- `O(n⋅log(n))` approximate MVMs with isotropic kernel matrices using a type of **Barnes-Hut algorithm**.
-- `O(n⋅log(n))` **sparsification** of isotropic kernel matrices with subsequent `O(k)` MVMs, where `k` is the number of non-zeros.
+- `O(n²d²)` exact MVMs with kernel matrices arising from [Hessian observations](#hessian-kernels) in contrast to the naïve `O(n²d⁴)` complexity.
+- `O(n⋅log(n))` exact MVMs and `O(n²)` linear solves with isotropic kernel matrices on a uniform grid, automatically taking advantage of [Toeplitz structure](#toeplitz-structure).
+- `O(n⋅log(n))` approximate MVMs with isotropic kernel matrices using a type of [Barnes-Hut algorithm](#barnes-hut).
+- `O(n⋅log(n))` [sparsification](#sparsification) of isotropic kernel matrices with subsequent `O(k)` MVMs, where `k` is the number of non-zeros.
 
 ## Basic Usage
 This example shows how to construct a kernel matrix using the `gramian` function and highlights the small memory footprint of the lazy representation and the matrix-vector multiplication with `mul!`.
