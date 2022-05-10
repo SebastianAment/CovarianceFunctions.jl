@@ -144,6 +144,7 @@ x_naive ≈ x_fast
 ```
 
 ## Gradient Kernels
+
 When conditioning Gaussian processes on gradient information,
 it is necessary to work with `d × d` *matrix-valued* gradient kernels,
 where `d` is the dimension of the input.
@@ -171,7 +172,20 @@ b = zero(a);
 Note that the last multiplication was with a **million by million matrix**,
 which would be impossible without CovarianceFunctions.jl's lazy and structured representation of the gradient kernel matrix.
 
-Furthermore, CovarianceFunctions.jl can compute structured representations of more complex and composite kernels maintaining the fast `O(d)` matrix vector multiply.
+To highlight the scalability of this MVM algorithm, we compare against the implementation in [GPyTorch](https://docs.gpytorch.ai/en/stable/kernels.html?highlight=kernels#rbfkernelgrad) and the fast *approximate* MVM provided by [D-SKIP](https://github.com/ericlee0803/GP_Derivatives).
+
+<p align="center">
+    <img src="images/gradient_kernel_mvm_comparison.png" width="700">
+</p>
+
+The plot shows timing benchmarks for MVMs with the exponentiated quadratic (RBF) gradient kernel with `n = 1024` as a function of the dimension `d`.
+GPyTorch's implementation uses a naïve implementation that scales as `O(n²d²)`. D-SKIP's MVM scales linearly in `d`, but the required pre-processing scales quadratically in `d` and dominates the total runtime.
+We see that our mathematically exact MVM scales linearly into high dimensions.
+
+At this time, both GPyTorch and D-SKIP only support two gradient kernels each and the only kernel that is supported by both is the exponentiated quadratic (RBF) gradient kernel.
+In contrast, CovarianceFunctions.jl provides scalable `O(n²d)` MVMs for a large class of kernels including all isotropic and dot-product kernels,
+and **extends to complex composite kernels like MacKay's neural network kernel and the spectral mixture kernel**.
+This is achieved by computing a structured representation of the kernel matrix through a **matrix-structure-aware automatic differentiation**.
 The following exemplifies this with a combination of Matérn, quadratic, and neural network kernels using 1024 points in 1024 dimensions:
 ```julia
 matern = CovarianceFunctions.MaternP(2); # matern
