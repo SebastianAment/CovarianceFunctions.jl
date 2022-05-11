@@ -150,7 +150,7 @@ it is necessary to work with `d × d` *matrix-valued* gradient kernels,
 where `d` is the dimension of the input.
 [Roos et al.](https://proceedings.mlr.press/v139/de-roos21a/de-roos21a.pdf) first noted that isotropic and dot product kernels give rise to gradient kernel matrices with a data-sparse structure and proposed a direct method with an `O(n²d + n⁶)` complexity for the low-data regime, where the number of observations `n` is small.
 
-CovarianceFunctions.jl implements an automatic structure derivation engine for a large range of kernel functions, including complex combinations of kernels and the neural network kernel, permitting a matrix-vector product in `O(n²d)` operations with gradient kernel matrices.
+CovarianceFunctions.jl implements an automatic structure derivation engine for a large range of kernel functions, including **complex composite kernels like MacKay's neural network kernel and the spectral mixture kernel**, permitting an **exact** matrix-vector product in `O(n²d)` operations with gradient kernel matrices.
 It also contains a generic fallback with the regular `O(n²d²)` complexity for cases where no special structure is present or currently implemented.
 For example,
 ```julia
@@ -174,16 +174,32 @@ which would be impossible without CovarianceFunctions.jl's lazy and structured r
 
 To highlight the scalability of this MVM algorithm, we compare against the implementation in [GPyTorch](https://docs.gpytorch.ai/en/stable/kernels.html?highlight=kernels#rbfkernelgrad) and the fast *approximate* MVM provided by [D-SKIP](https://github.com/ericlee0803/GP_Derivatives).
 
-<p align="center">
+<!-- <p align="center">
     <img src="images/gradient_kernel_mvm_comparison.png" width="700">
+</p> -->
+
+<p align="center">
+  <img src="images/gradient_kernel_mvm_comparison.png" width="600">
+  <!-- <img src="images/gradient_kernel_mvm_accuracy.png" width="375"> -->
 </p>
 
-The plot shows timing benchmarks for MVMs with the exponentiated quadratic (RBF) gradient kernel with `n = 1024` as a function of the dimension `d`.
-GPyTorch's implementation uses a naïve implementation that scales as `O(n²d²)`. D-SKIP's MVM scales linearly in `d`, but the required pre-processing scales quadratically in `d` and dominates the total runtime.
-We see that our mathematically exact MVM scales linearly into high dimensions.
+<!-- <img align="right" src="images/gradient_kernel_mvm_accuracy.png" width="300"> -->
+The plot above shows MVM times with the exponentiated quadratic (RBF) gradient kernel with `n = 1024` as a function of the dimension `d`.
+Notably, GPyTorch's implementation scales with the naïve complexity `O(n²d²)`.
+D-SKIP's MVM scales linearly in `d`, but the required pre-processing scales quadratically in `d` and dominates the total runtime.
+Further, D-SKIP is restricted to seperable product kernels that give rise to low rank constituent kernel matrices.
+The accuracy plot below
+compares D-SKIP and CovarianceFunctions.jl's MVM against the naïve dense MVM.
+CovarianceFunctions.jl's MVM is mathematically exact and scales linearly with `d` into high dimensions.
+
+<p align="center">
+  <img src="images/gradient_kernel_mvm_accuracy.png" width="600">
+</p>
 
 At this time, both GPyTorch and D-SKIP only support two gradient kernels each and the only kernel that is supported by both is the exponentiated quadratic (RBF) gradient kernel.
-In contrast, CovarianceFunctions.jl provides scalable `O(n²d)` MVMs for a large class of kernels including all isotropic and dot-product kernels,
+In contrast, CovarianceFunctions.jl provides scalable `O(n²d)` MVMs
+that are accurate to machine precision
+for a large class of kernels including all isotropic and dot-product kernels,
 and **extends to complex composite kernels like MacKay's neural network kernel and the spectral mixture kernel**.
 This is achieved by computing a structured representation of the kernel matrix through a **matrix-structure-aware automatic differentiation**.
 The following exemplifies this with a combination of Matérn, quadratic, and neural network kernels using 1024 points in 1024 dimensions:
