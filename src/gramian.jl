@@ -161,13 +161,22 @@ gramian(k, x, ::InputTrait) = gramian(k, x)
 
 # 1D stationary kernel on equi-spaced grid yields Toeplitz structure
 # works if input_trait(k) <: Union{IsotropicInput, StationaryInput}
-gramian(k, x::StepRangeLen{<:Real}) = gramian(k, x, input_trait(k))
+gramian(k, x::StepRangeLen{<:Real}, y::StepRangeLen{<:Real}) = gramian(k, x, y, input_trait(k))
+gramian(k, x::StepRangeLen{<:Real}, y::StepRangeLen{<:Real}, ::GenericInput) = Gramian(k, x, y)
 
 # IDEA: should this be in factorization? since dft still costs linear amount of information
 # while gramian is usually lazy and O(1) in structure construction
-function gramian(k, x::StepRangeLen{<:Real}, ::Union{IsotropicInput, StationaryInput})
-    k1 = k.(x[1], x)
-    SymmetricToeplitz(k1)
+function gramian(k, x::StepRangeLen{<:Real}, y::StepRangeLen{<:Real}, ::Union{IsotropicInput, StationaryInput})
+    if x === y
+        k1 = k.(x[1], x)
+        SymmetricToeplitz(k1)
+    elseif x.step == y.step
+        k1 = k.(x, y[1])
+        k2 = k.(x[1], y)
+        Toeplitz(k1, k2)
+    else
+        Gramian(k, x, y)
+    end
 end
 
 # 1D stationary kernel on equi-spaced grid with periodic boundary conditions
@@ -228,7 +237,7 @@ end
 function BlockFactorizations.blockmul!(y::AbstractVecOfVecOrMat, G::Gramian, x::AbstractVecOfVecOrMat, α::Real = 1, β::Real = 0)
     Gijs = [G[1, 1] for _ in 1:Base.Threads.nthreads()] # pre-allocate storage for elements
     IT = input_trait(G.k)
-    @threads for i in eachindex(y)
+    @threads for i in eachindex(y) # NOTE: without threading, this does not allocate anything
         @. y[i] = β * y[i]
         Gij = Gijs[Base.Threads.threadid()]
         for j in eachindex(x)

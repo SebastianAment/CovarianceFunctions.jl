@@ -128,7 +128,29 @@ end
     @test G isa Circulant
     @test size(G) == (n, n)
     @test G*x ≈ Matrix(G)*x
-    # @test Matrix(G) ≈ Matrix(Gramian(k, x))
+
+    k = (x, y)->CovarianceFunctions.EQ()(x, y)
+    G = gramian(k, x)
+    @test G isa Gramian # if we can't infer the input trait of k, falls back to lazy representation
+    @test Matrix(G) ≈ Matrix(Gramian(k, x))
+
+    # testing that we can hook anonymous kernel into the system
+    CovarianceFunctions.input_trait(::typeof(k)) = CovarianceFunctions.IsotropicInput()
+    G = gramian(k, x)
+    @test G isa SymmetricToeplitz
+    @test Matrix(G) ≈ Matrix(Gramian(k, x))
+
+    # testing non-symmetric Toeplitz systems
+    y = x .+ randn() # shifted version of x with same step length
+    G = gramian(k, x, y)
+    @test G isa Toeplitz
+    @test Matrix(G) ≈ Matrix(Gramian(k, x, y))
+
+    y = range(-1, 1, n÷2) # if y has different step length, defaults to gramian
+    G = gramian(k, x, y)
+    @test G isa Gramian
+    @test Matrix(G) ≈ Matrix(Gramian(k, x, y))
+
 end # test solves and multiplications
 
 end # TestGramian
