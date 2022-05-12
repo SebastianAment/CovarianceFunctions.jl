@@ -161,12 +161,12 @@ gramian(k, x, ::InputTrait) = gramian(k, x)
 
 # 1D stationary kernel on equi-spaced grid yields Toeplitz structure
 # works if input_trait(k) <: Union{IsotropicInput, StationaryInput}
-gramian(k, x::StepRangeLen{<:Real}, y::StepRangeLen{<:Real}) = gramian(k, x, y, input_trait(k))
-gramian(k, x::StepRangeLen{<:Real}, y::StepRangeLen{<:Real}, ::GenericInput) = Gramian(k, x, y)
+gramian(k, x::StepRangeLen, y::StepRangeLen) = gramian(k, x, y, input_trait(k))
+gramian(k, x::StepRangeLen, y::StepRangeLen, ::GenericInput) = Gramian(k, x, y)
 
 # IDEA: should this be in factorization? since dft still costs linear amount of information
 # while gramian is usually lazy and O(1) in structure construction
-function gramian(k, x::StepRangeLen{<:Real}, y::StepRangeLen{<:Real}, ::Union{IsotropicInput, StationaryInput})
+function gramian(k, x::StepRangeLen, y::StepRangeLen, ::Union{IsotropicInput, StationaryInput})
     if x === y
         k1 = k.(x[1], x)
         SymmetricToeplitz(k1)
@@ -180,7 +180,7 @@ function gramian(k, x::StepRangeLen{<:Real}, y::StepRangeLen{<:Real}, ::Union{Is
 end
 
 # 1D stationary kernel on equi-spaced grid with periodic boundary conditions
-function gramian(k::StationaryKernel, x::StepRangeLen{<:Real}, ::PeriodicInput)
+function gramian(k::StationaryKernel, x::StepRangeLen, ::PeriodicInput)
     k1 = k.(x[1], x)
     Circulant(k1)
 end
