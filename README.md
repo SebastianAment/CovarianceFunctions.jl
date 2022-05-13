@@ -1,6 +1,7 @@
 # CovarianceFunctions.jl
 [![CI](https://github.com/SebastianAment/CovarianceFunctions.jl/actions/workflows/CI.yml/badge.svg)](https://github.com/SebastianAment/CovarianceFunctions.jl/actions/workflows/CI.yml)
 [![codecov](https://codecov.io/gh/SebastianAment/CovarianceFunctions.jl/branch/main/graph/badge.svg?token=04NSNJC9H1)](https://codecov.io/gh/SebastianAment/CovarianceFunctions.jl)
+[![MIT license](http://img.shields.io/badge/license-MIT-brightgreen.svg)](http://opensource.org/licenses/MIT)
 
 CovarianceFunctions.jl's primary goal are efficient computations with kernel matrices, also called `Gramian`'s.
 To this end, the package implements a *lazy* `Gramian` type, which
