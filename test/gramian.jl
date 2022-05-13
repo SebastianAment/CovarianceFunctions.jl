@@ -15,8 +15,12 @@ using BlockFactorizations
 
     @test issymmetric(G)
     M = Matrix(G)
+    @test M ≈ AbstractMatrix(G)
+    @test G' ≈ M'
+    @test transpose(G) ≈ transpose(M)
     @test M ≈ k.(x, x')
     @test issymmetric(G) && issymmetric(M)
+    @test ishermitian(G) && ishermitian(M)
     @test isposdef(G) && isposdef(M) # if M is very low-rank, this can fail -> TODO: ispsd()
 
     G = gramian(k, x, x .+ randn(size(x)))
@@ -29,7 +33,7 @@ using BlockFactorizations
     @test isposdef(G)
 
     # testing standard Gramian
-    G = Gramian(x, x)
+    G = gramian(x)
     @test G ≈ dot.(x, x')
 
     x = randn(Float64, n)
@@ -67,6 +71,28 @@ using BlockFactorizations
     @test size(B) == (n, p)
     @test B ≈ Matrix(G) * A
 
+    # testing scalar indexing
+    G = gramian(k, x, y)
+    for i in 1:n
+        for j in 1:n
+            @test G[i, j] ≈ k(x[i], y[j])
+        end
+    end
+
+    # testing non-scalar indexing
+    i, j = 2:n-1, 3:2n-4
+    Gij = G[i, j]
+    @test Gij isa AbstractMatrix
+    @test Gij ≈ gramian(k, x[i], y[j])
+
+    i, j = 2:n-1, 2
+    Gij = G[i, j]
+    @test Gij isa AbstractVector
+    @test Gij ≈ vec(gramian(k, x[i], [y[j]]))
+
+    Gij = G[j, i]
+    @test Gij isa AbstractVector
+    @test Gij ≈ vec(gramian(k, [x[j]], y[i]))
 end
 
 @testset "Gramian factorization" begin

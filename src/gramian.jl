@@ -38,12 +38,17 @@ gramian_eltype(k, x, y) = typeof(k(x, y)) # default to evaluation
     @boundscheck checkbounds(G, i, j) # add bounds check to G
     @inbounds G.k(G.x[i], G.y[j]) # remove boundscheck of x of x and y
 end
-
-# TODO: should we make this a view?
-function Base.getindex(G::Gramian, i::Union{AbstractArray, Colon},
-                                                j::Union{AbstractArray, Colon})
+function Base.getindex(G::Gramian, i, j::Integer)
     @boundscheck checkbounds(G, i, j) # add bounds check to G
-    @inbounds gramian(G.k, G.x[i], G.y[j])
+    @inbounds @views G.k.(G.x[i], (G.y[j],))
+end
+function Base.getindex(G::Gramian, i::Integer, j)
+    @boundscheck checkbounds(G, i, j) # add bounds check to G
+    @inbounds @views G.k.((G.x[i],), G.y[j])
+end
+function Base.getindex(G::Gramian, i, j)
+    @boundscheck checkbounds(G, i, j) # add bounds check to G
+    @inbounds @views Matrix(gramian(G.k, G.x[i], G.y[j]))
 end
 
 # maintain laziness by default when adding diagonal
@@ -57,10 +62,6 @@ end
 # IDEA: GPU
 using LinearAlgebra: checksquare
 using Base.Threads
-# probably not necessary anymore, with BlockFactorization
-function Base.:*(G::Gramian{<:AbstractMatOrFac{<:Real}}, x::AbstractVecOfVec{<:Number})
-    mul!(deepcopy(x), G, x)
-end
 # make generic multiply multi-threaded and SIMD-enabled
 function Base.:*(G::Gramian, a::AbstractVector)
     T = promote_type(eltype(G), eltype(a))
