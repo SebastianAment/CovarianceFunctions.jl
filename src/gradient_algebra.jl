@@ -2,12 +2,12 @@
 ################################# Sum ##########################################
 # allocates space for gradient kernel evaluation but does not evaluate
 # the separation from evaluation is useful for ValueGradientKernel
-function allocate_gradient_kernel(k::Sum, x, y, ::GenericInput)
-    H = [allocate_gradient_kernel(h, x, y, input_trait(h)) for h in k.args]
+function gradient_kernel(k::Sum, x, y, ::GenericInput)
+    H = [gradient_kernel(h, x, y, input_trait(h)) for h in k.args]
     LazyMatrixSum(H)
 end
 
-# NOTE: K should be allocated with allocate_gradient_kernel(k, x, y)
+# NOTE: K should have been previously allocated with gradient_kernel(k, x, y)
 function gradient_kernel!(K::LazyMatrixSum, k::Sum, x::AbstractVector, y::AbstractVector, ::GenericInput)
     for i in eachindex(k.args)
         h = k.args[i]
@@ -20,17 +20,28 @@ end
 # for product kernel with generic input
 function allocate_gradient_kernel(k::Product, x, y, ::GenericInput)
     d, r = length(x), length(k.args)
-    H = (allocate_gradient_kernel(h, x, y, input_trait(h)) for h in k.args)
+    H = (gradient_kernel(h, x, y, input_trait(h)) for h in k.args)
     T = typeof(k(x, y))
     A = LazyMatrixSum(
                 (LazyMatrixProduct(Diagonal(zeros(T, d)), h) for h in H)...
                 )
-    U = zeros(T, (d, r))
+    U = zeros(T, (d, r)) # storage for Jacobian
     V = zeros(T, (d, r))
     C = Woodbury(I(r), ones(r), ones(r)', -1)
-    Woodbury(A, U, C, V')
+    W = Woodbury(A, U, C, V')
+end
+function gradient_kernel(k::Product, x, y, ::GenericInput)
+    W = allocate_gradient_kernel(k, x, y, GenericInput())
+    gradient_kernel!(W, k, x, y, GenericInput())
 end
 
+# IDEA: could have kernel element for heterogeneous product kernels, problem: would need to
+# pre-allocate storage for Jacobian matrix or be allocating
+# struct ProductGradientKernelElement{T, K, X, Y} <: Factorization{T}
+#     k::K
+#     x::X
+#     y::Y
+# end
 function gradient_kernel!(W::Woodbury, k::Product, x::AbstractVector, y::AbstractVector, ::GenericInput = input_trait(k))
     A = W.A # this is a LazyMatrixSum of LazyMatrixProducts
     ForwardDiff.jacobian!(W.U, z->k(z, y), x)

@@ -5,8 +5,9 @@ using BlockFactorizations
 
 using CovarianceFunctions
 using CovarianceFunctions: EQ, RQ, Dot, ExponentialDot, NN, Matern, MaternP,
-        Lengthscale, input_trait, GradientKernel, ValueGradientKernel,
-        DerivativeKernel, ValueDerivativeKernel, DerivativeKernelElement, Cosine
+        Lengthscale, input_trait, GradientKernel, ValueGradientKernel, GradientKernelElement,
+        DerivativeKernel, ValueDerivativeKernel, DerivativeKernelElement, Cosine,
+        Woodbury, LazyMatrixProduct, ConstantKernel
 
 const AbstractMatOrFac = Union{AbstractMatrix, Factorization}
 
@@ -60,6 +61,26 @@ const AbstractMatOrFac = Union{AbstractMatrix, Factorization}
             as = K \ Ka
             @test norm(K*as-Ka) / norm(Ka) < 1e-6
         end
+
+        # testing non-lazy data-sparse representation
+        x, y = X[:, 1], X[:, 2]
+        a = randn(length(x))
+        G = GradientKernelElement(EQ(), x, y)
+        W = Woodbury(G)
+        @test W*a ≈ G*a
+
+        G = GradientKernelElement(Dot()^3, x, y)
+        W = Woodbury(G)
+        @test W*a ≈ G*a
+
+        G = GradientKernelElement(Cosine(randn(d)), x, y)
+        W = LazyMatrixProduct(G)
+        @test W*a ≈ G*a
+
+        # testing constant kernel
+        c = ConstantKernel(1)
+        g = GradientKernel(c)
+        @test g(x, y) ≈ zeros(d, d)
     end
 
     # TODO:

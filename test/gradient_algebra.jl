@@ -61,6 +61,8 @@ end
     @test K*a ≈ MK*a
     @test K*a ≈ Mkk*a + Mkh*a
     @test K*a ≈ Kk*a + Kh*a
+
+    # TODO: Chained, VerticalScaling, Warped, SeparableSum, SeparableProduct, Product
 end
 
 end

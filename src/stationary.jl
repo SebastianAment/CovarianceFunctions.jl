@@ -12,16 +12,17 @@
 ############################# constant kernel ##################################
 # can be used to rescale existing kernels
 # IDEA: Allow Matrix-valued constant
-struct Constant{T} <: IsotropicKernel{T}
+struct ConstantKernel{T} <: IsotropicKernel{T}
     c::T
-    function Constant(c, check::Bool = true)
+    function ConstantKernel(c, check::Bool = true)
         if check && !ispsd(c)
             throw(DomainError("Constant is not positive semi-definite: $c"))
         end
         new{typeof(c)}(c)
     end
 end
-@functor Constant
+@functor ConstantKernel
+const Constant = ConstantKernel
 
 # isisotropic(::Constant) = true
 # ismercer(k::Constant) = ispsd(k.c)

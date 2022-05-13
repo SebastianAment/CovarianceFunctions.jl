@@ -19,29 +19,15 @@ function elsize(G::Gramian{<:AbstractMatrix, <:GradientKernel}, i::Int)
     i ≤ 2 ? length(G.x[1]) : 1
 end
 
-function (G::GradientKernel)(x::AbstractVector, y::AbstractVector)
-    gradient_kernel(G.k, x, y, input_trait(G))
+(G::GradientKernel)(x, y) = gradient_kernel(G.k, x, y, G.input_trait)
+
+# O(d²) fallback for non-structured case
+function gradient_kernel(k, x, y, ::GenericInput)
+    K = zeros(gramian_eltype(k, x, y), length(x), length(y))
+    gradient_kernel!(K, k, x, y, GenericInput())
 end
 
-# need this to work with BlockFactorizations, see blockmul! in gramian
-function evaluate_block!(K, G::GradientKernel, x::AbstractVector, y::AbstractVector, T::InputTrait = input_trait(G.k))
-    gradient_kernel!(K, G.k, x, y, T)
-end
-
-# necessary?
-function gradient_kernel(k, x::AbstractVector, y::AbstractVector, T::InputTrait) #::GenericInput = GenericInput())
-    K = allocate_gradient_kernel(k, x, y, T)
-    gradient_kernel!(K, k, x, y, T)
-end
-
-# allocates space for gradient kernel evaluation but does not evaluate
-# separation from evaluation useful for ValueGradientKernel
-# x and y should have same length, i.e. dimensionality
-function allocate_gradient_kernel(k, x, y, ::GenericInput)
-    zeros(gramian_eltype(k, x, y), length(x), length(y))
-end
-
-function gradient_kernel!(K::AbstractMatrix, k, x::AbstractVector, y::AbstractVector, ::GenericInput)
+function gradient_kernel!(K::AbstractMatrix, k, x, y, ::GenericInput)
     value = zeros(eltype(K), length(x)) # necessary?
     derivs = K # jacobian (higher order terms)
     result = DiffResults.DiffResult(value, K)
@@ -59,12 +45,15 @@ struct GradientKernelElement{T, K, X, Y, IT} <: Factorization{T}
     input_trait::IT
 end
 
+function GradientKernelElement(k, x, y, IT::InputTrait = input_trait(k))
+    T = gramian_eltype(k, x, y)
+    GradientKernelElement{T, typeof(k), typeof(x), typeof(y), typeof(IT)}(k, x, y, IT)
+end
 Base.size(K::GradientKernelElement) = (length(K.x), length(K.y))
 Base.size(K::GradientKernelElement, i::Int) = 1 ≤ i ≤ 2 ? size(K)[i] : 1
 Base.eltype(K::GradientKernelElement{T}) where T = T
 # gradient kernel element only used for sparsely representable elements
-# Base.Matrix(K::GradientKernelElement) = Matrix(Woodbury(K))
-Base.Matrix(K::GradientKernelElement) =  K * I(size(K, 1))
+Base.Matrix(K::GradientKernelElement) = K * I(size(K, 1))
 
 function Base.:*(G::GradientKernelElement, a)
     T = promote_type(eltype(G), eltype(a))
@@ -101,17 +90,13 @@ function WoodburyFactorizations.Woodbury(K::IsotropicGradientKernelElement)
     return K = Woodbury(D, r, C, r')
 end
 
-function allocate_gradient_kernel(k, x, y, ::IsotropicInput)
-    T = gramian_eltype(k, x, y)
-    IsotropicGradientKernelElement{T}(k, x, y)
-end
-
-function gradient_kernel!(K::IsotropicGradientKernelElement, k, x::AbstractVector, y::AbstractVector, ::IsotropicInput)
+function gradient_kernel!(K::IsotropicGradientKernelElement, k, x, y, ::IsotropicInput)
     typeof(K)(k, x, y, IsotropicInput())
 end
 
-function gradient_kernel(k, x::AbstractVector, y::AbstractVector, ::IsotropicInput)
-    allocate_gradient_kernel(k, x, y, IsotropicInput())
+function gradient_kernel(k, x, y, ::IsotropicInput)
+    T = gramian_eltype(k, x, y)
+    IsotropicGradientKernelElement{T}(k, x, y)
 end
 
 const DotProductGradientKernelElement{T, K, X, Y} = GradientKernelElement{T, K, X, Y, DotProductInput}
@@ -136,19 +121,14 @@ function WoodburyFactorizations.Woodbury(K::DotProductGradientKernelElement)
     return K = Woodbury(D, copy(y), C, copy(x)')
 end
 
-function allocate_gradient_kernel(k, x, y, T::DotProductInput)
-    T = gramian_eltype(k, x, y)
-    DotProductGradientKernelElement{T}(k, x, y)
-end
-
-function gradient_kernel!(K::DotProductGradientKernelElement, k, x::AbstractVector, y::AbstractVector, ::DotProductInput)
+function gradient_kernel!(K::DotProductGradientKernelElement, k, x, y, ::DotProductInput)
     typeof(K)(k, x, y, DotProductInput())
 end
 
-function gradient_kernel(k, x::AbstractVector, y::AbstractVector, ::DotProductInput)
-    allocate_gradient_kernel(k, x, y, DotProductInput())
+function gradient_kernel(k, x, y, ::DotProductInput)
+    T = gramian_eltype(k, x, y)
+    DotProductGradientKernelElement{T}(k, x, y)
 end
-
 
 const LinearFunctionalGradientKernelElement{T, K, X, Y} = GradientKernelElement{T, K, X, Y, StationaryLinearFunctionalInput}
 function LinearFunctionalGradientKernelElement{T}(k, x, y) where T
@@ -171,31 +151,30 @@ function LazyMatrixProduct(K::LinearFunctionalGradientKernelElement)
     r = difference(x, y)
     cr = dot(k.c, r)
     k1, k2 = derivative_laplacian(k, cr)
-    c = zeros(eltype(k.c), length(x))
+    c = zeros(eltype(k.c), length(x), 1)
     @. c = k.c
     c2 = -k2*c
     return LazyMatrixProduct(c, c2')
 end
 
-function allocate_gradient_kernel(k, x, y, T::StationaryLinearFunctionalInput)
+# is this necessary?
+function gradient_kernel!(K::LinearFunctionalGradientKernelElement, k, x, y, ::StationaryLinearFunctionalInput)
+    typeof(K)(k, x, y, StationaryLinearFunctionalInput())
+end
+
+function gradient_kernel(k, x, y, ::StationaryLinearFunctionalInput)
     T = gramian_eltype(k, x, y)
     LinearFunctionalGradientKernelElement{T}(k, x, y)
 end
 
-function gradient_kernel!(K::LinearFunctionalGradientKernelElement, k, x::AbstractVector, y::AbstractVector, ::StationaryLinearFunctionalInput)
-    typeof(K)(k, x, y, StationaryLinearFunctionalInput())
-end
-
-function gradient_kernel(k, x::AbstractVector, y::AbstractVector, ::StationaryLinearFunctionalInput)
-    allocate_gradient_kernel(k, x, y, StationaryLinearFunctionalInput())
-end
-
 ############################# Constant Kernel ##################################
 # efficient specialization for constants
-function allocate_gradient_kernel(k::Constant, x, y, ::InputTrait)
+# IDEA: have special constant input trait, since it can combine with any kernel
+function gradient_kernel(k::Constant, x, y, ::IsotropicInput)
     Zeros(length(x), length(y))
 end
-gradient_kernel!(K::Zeros, k::Constant, x, y, ::InputTrait) = K
+gradient_kernel!(K::Zeros, k::Constant, x, y, ::IsotropicInput) = K
+gradient_kernel!(K::AbstractMatrix, k::Constant, x, y, ::IsotropicInput) = (K .= 0)
 
 ########################### Neural Network Kernel ##############################
 # specialization of gradient nn kernel, written before more general AD-implementation,
@@ -444,24 +423,24 @@ function elsize(G::Gramian{<:AbstractMatrix, <:ValueGradientKernel}, i::Int)
 end
 
 # computes covariances of the function and its derivative.
-function (G::ValueGradientKernel)(x::AbstractVector, y::AbstractVector)
+function (G::ValueGradientKernel)(x, y)
     value_gradient_kernel(G.k, x, y, input_trait(G.k))
 end
 
-function value_gradient_kernel(k, x::AbstractVector, y::AbstractVector, T::InputTrait = input_trait(G.k))
+function value_gradient_kernel(k, x, y, T::InputTrait = input_trait(G.k))
     d = length(x)
     kxy = k(x, y)
     value_value = kxy
     value_gradient = MVector{d, typeof(kxy)}(undef)
     gradient_value = MVector{d, typeof(kxy)}(undef)
-    gradient_gradient = allocate_gradient_kernel(k, x, y, T)
+    gradient_gradient = gradient_kernel(k, x, y, T)
     K = DerivativeKernelElement(value_value, value_gradient, gradient_value, gradient_gradient)
     value_gradient_kernel!(K, k, x, y, T)
 end
 
 # IDEA: specialize evaluate for IsotropicInput, DotProductInput
 # returns block matrix
-function value_gradient_kernel!(K::DerivativeKernelElement, k, x::AbstractVector, y::AbstractVector, T::InputTrait)
+function value_gradient_kernel!(K::DerivativeKernelElement, k, x, y, T::InputTrait)
     K.value_value = k(x, y)
     K.value_gradient .= ForwardDiff.gradient(z->k(x, z), y) # ForwardDiff.gradient!(r, z->k(z, y), x)
     K.gradient_value .= ForwardDiff.gradient(z->k(z, y), x)
@@ -469,7 +448,7 @@ function value_gradient_kernel!(K::DerivativeKernelElement, k, x::AbstractVector
     return K
 end
 
-function value_gradient_kernel!(K::DerivativeKernelElement, k, x::AbstractVector, y::AbstractVector, T::DotProductInput)
+function value_gradient_kernel!(K::DerivativeKernelElement, k, x, y, T::DotProductInput)
     xy = dot(x, y)
     k0, k1 = value_derivative(k, xy)
     K.value_value = k0
@@ -479,7 +458,7 @@ function value_gradient_kernel!(K::DerivativeKernelElement, k, x::AbstractVector
     return K
 end
 
-function value_gradient_kernel!(K::DerivativeKernelElement, k, x::AbstractVector, y::AbstractVector, T::IsotropicInput)
+function value_gradient_kernel!(K::DerivativeKernelElement, k, x, y, T::IsotropicInput)
     r = K.gradient_value
     @. r = x - y
     d² = sum(abs2, r)
@@ -493,10 +472,10 @@ function value_gradient_kernel!(K::DerivativeKernelElement, k, x::AbstractVector
 end
 
 # need this to work with BlockFactorizations, see blockmul! in gramian
-function evaluate_block!(K::DerivativeKernelElement, G::ValueGradientKernel,
-            x::AbstractVector, y::AbstractVector, T::InputTrait = input_trait(G.k))
-    value_gradient_kernel!(K, G.k, x, y, T)
-end
+# function evaluate_block!(K::DerivativeKernelElement, G::ValueGradientKernel,
+#             x, y, T::InputTrait = input_trait(G.k))
+#     value_gradient_kernel!(K, G.k, x, y, T)
+# end
 
 ################################################################################
 # for 1d inputs
