@@ -10,13 +10,13 @@ kernel methods efficiently without running out of memory.
 Further, the code automatically recognizes when certain linear algebraic structures are present and exploits them for computational efficiency, in particular for fast matrix-vector multiplications (MVMs).
 
 Feature highlights include
-- lazy representations of kernel matrices with `O(1)` memory footprint and efficient, parallelized MVMs.
-- `O(n²d)` exact MVMs with kernel matrices arising from [gradient observations](#gradient-kernels)
-in contrast to the naïve `O(n²d²)` complexity.
-- `O(n²d²)` exact MVMs with kernel matrices arising from [Hessian observations](#hessian-kernels) in contrast to the naïve `O(n²d⁴)` complexity.
-- `O(n⋅log(n))` exact MVMs and `O(n²)` linear solves with isotropic kernel matrices on a uniform grid, automatically taking advantage of [Toeplitz structure](#toeplitz-structure).
-- `O(n⋅log(n))` approximate MVMs with isotropic kernel matrices using a type of [Barnes-Hut algorithm](#barnes-hut).
-- `O(n⋅log(n))` [sparsification](#sparsification) of isotropic kernel matrices with subsequent `O(k)` MVMs, where `k` is the number of non-zeros.
+- [Lazy representation](#basic-usage): kernel matrices with `O(1)` memory footprint and efficient, parallelized MVMs.
+- [Gradient observations](#gradient-kernels): `O(n²d)` exact MVMs with kernel matrices arising from GPs with gradient observations, in contrast to the naïve `O(n²d²)` complexity.
+- [Hessian observations](#hessian-kernels): `O(n²d²)` exact MVMs with kernel matrices arising from GPs with Hessian observations in contrast to the naïve `O(n²d⁴)` complexity.
+- [Toeplitz structure](#toeplitz-structure): `O(n⋅log(n))` exact MVMs and `O(n²)` exact linear solves with isotropic kernel matrices on a uniform grid.
+- [Kronecker structure](#kronecker-structure): `O(nᵈ⁺¹)` exact MVMs and `O(nᵈ⁺²)` exact linear solves with separable product kernels matrices on a Cartesian grid in `d` dimensions.
+- [Barnes-Hut algorithm](#barnes-hut): `O(n⋅log(n))` approximate MVMs with isotropic kernel matrices.
+- [Sparsification](#sparsification): `O(n⋅log(n))` sparsification of isotropic kernel matrices with subsequent `O(k)` MVMs, where `k` is the number of non-zeros.
 
 ## Basic Usage
 This example shows how to construct a kernel matrix using the `gramian` function and highlights the small memory footprint of the lazy representation and the matrix-vector multiplication with `mul!`.
@@ -143,6 +143,55 @@ Notably, the results are equal to machine precision:
 x_naive ≈ x_fast
   true
 ```
+
+## Kronecker Structure
+
+Taking the Cartesian product of `d` vectors with `n` points each gives rise to a regular grid of `nᵈ` `d`-dimensional points.
+Kernel matrices constructed with such grids naïvely have a `O(n²ᵈ)`  MVM complexity and `O(n³ᵈ)` inversion complexity.
+However, separable (a.k.a. direct) product kernels,
+evaluated on such grids give rise to Kronecker product structure,
+which allows for much faster `O(nᵈ⁺¹)` multiplies and `O(nᵈ⁺²)` solves, an exponential improvement in `d`.
+To see how to exploit this structure, note that CovarianceFunctions.jl can lazily represent a Cartesian grid using `LazyGrid`:
+```julia
+using LinearAlgebra
+using CovarianceFunctions
+using CovarianceFunctions: LazyGrid, SeparableProduct
+d, n = 3, 128;
+x = randn(n);
+@time gx = LazyGrid(x, d);
+  0.000025 seconds (9 allocations: 288 bytes)
+length(gx)
+  2097152
+```
+Now, we'll construct a separable product kernel in `d` dimensions:
+```julia
+k = CovarianceFunctions.Exp()
+p = SeparableProduct(fill(k, d)) # separable product kernel
+```
+Subsequently calling `gramian` on `p` and the grid `gx` **automatically**
+represents the matrix as a lazy `KroneckerProduct` structure,
+which we implemented in [KroneckerProducts.jl](https://github.com/SebastianAment/KroneckerProducts.jl):
+```julia
+@time G = gramian(p, gx);
+  0.000023 seconds (11 allocations: 624 bytes)
+using KroneckerProducts
+G isa KroneckerProduct
+  true
+```
+This allows for very efficient multiplies, factorizations, and solves:
+```julia
+a = randn(n^d);
+size(G)
+  (2097152, 2097152)
+@time F = cholesky(G);
+  0.003127 seconds (155 allocations: 397.344 KiB)
+@time F \ a;
+  0.062468 seconds (97 allocations: 96.005 MiB)
+```
+That is, factorizing `G` and solving `F \ a` takes a fraction of a second, despite the linear system having more than **2 million** variables.
+Further, note that Kronecker structure can be combined with the [Toeplitz structure](#toeplitz-structure) above to yield
+`O(dn⋅log(n))` MVMs with the resulting kernel matrix.
+This is the basis of the [SKI framework](https://arxiv.org/pdf/1503.01057.pdf).
 
 ## Gradient Kernels
 

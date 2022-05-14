@@ -51,10 +51,10 @@ euclidean(x, y) = sqrt(euclidean2(x, y))
 enorm(A::AbstractMatOrFac, x::AbstractVector) = sqrt(enorm2(A, x))
 enorm2(A::AbstractMatOrFac, x::AbstractVector) = dot(x, A, x)
 
-# TODO: maybe include in and output dimension of kernel in type?
+# IDEA: maybe include in and output dimension of kernel in type?
 # this makes it easier to type check admissability of input arguments
 # and differentiate between data vector or vector of data
-# TODO: or instead, write run-time input check
+# or instead, write run-time input check
 # change to a boundscheck?
 function checklength(x::AbstractArray, y::AbstractArray)
     lx = length(x)
@@ -98,9 +98,9 @@ iscov(A::AbstractMatrix{<:Real}, tol::Real = 0.) = issymmetric(A) && ispsd(A, to
 iscov(k::MercerKernel, x = randn(32), tol = 1e-10) = iscov(gramian(k, x), tol)
 
 ####################### randomized stationarity tests ##########################
-# WARNING this test only allows for euclidean isotropy ...
+# NOTE this test only allows for euclidean isotropy ...
 # does not matter for 1d tests
-function isisotropic(k::MercerKernel, x::AbstractVector)
+function isisotropic(k::AbstractKernel, x::AbstractVector)
     isiso = false
     if isstationary(k)
         isiso = true

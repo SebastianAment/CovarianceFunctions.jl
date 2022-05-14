@@ -55,64 +55,80 @@ Base.:^(k::AbstractKernel, p::Number) = Power(k, p)
 
 ############################ Separable Product #################################
 # product kernel, but separately evaluates component kernels on different parts of the input
-struct SeparableProduct{T, K<:Tuple{Vararg{AbstractKernel}}} <: AbstractKernel{T}
+struct SeparableProduct{T, K} <: AbstractKernel{T}
     args::K # kernel for input covariances
-    function SeparableProduct(k::Tuple{Vararg{AbstractKernel}})
-        T = promote_type(eltype.(k)...)
-        new{T, typeof(k)}(k)
-    end
 end
 @functor SeparableProduct
-
+SeparableProduct(k...) = SeparableProduct(k)
+function SeparableProduct(k::Union{Tuple, AbstractVector})
+    T = promote_type(eltype.(k)...)
+    SeparableProduct{T, typeof(k)}(k)
+end
 # both x and y have to be vectors of inputs to individual kernels
 # could also consist of tuples ... so restricting to AbstractVector might not be good
-function (K::SeparableProduct)(x::AbstractVector, y::AbstractVector)
-    checklength(x, y)
-    val = one(eltype(K))
-    for (i, k) in enumerate(K.args)
-        val *= k(x[i], y[i])
+function (k::SeparableProduct)(x::AbstractVector, y::AbstractVector)
+    d = checklength(x, y)
+    length(k.args) == d || throw(DimensionMismatch("SeparableProduct needs d = $d kernels but has r = $(length(k.args))"))
+    val = one(gramian_eltype(k, x, y))
+    @inbounds @simd for i in eachindex(k.args)
+        ki = k.args[i]
+        val *= ki(x[i], y[i])
     end
     return val
 end
 
 # if we had kernel input type, could compare with eltype(X)
-function gramian(K::SeparableProduct, X::LazyGrid, Y::LazyGrid)
-    kronecker((gramian(kxy...) for kxy in zip(K.args, X.args, Y.args))...)
-end
-function gramian(K::SeparableProduct, X::LazyGrid)
-    kronecker((gramian(kx...) for kx in zip(K.args, X.args))...)
+function gramian(k::SeparableProduct, X::LazyGrid, Y::LazyGrid)
+    length(X.args) == length(Y.args) || throw(DimensionMismatch("length(X.args) = $(length(X.args)) ≠ $(length(Y.args)) = length(Y.args)"))
+    length(k.args) == length(X.args) || throw(DimensionMismatch("SeparableProduct needs d = $(length(X.args)) kernels but has r = $(length(k.args))"))
+    kronecker((gramian(kxy...) for kxy in zip(k.args, X.args, Y.args))...)
 end
 # IDEA: if points are not on a grid, can still evaluate dimensions separately,
-# and take elementwise product. Might lead to efficiency gains?
+# and take elementwise product. can lead to efficiency gains if constituent
+# matrices are of low rank (see SKIP paper)
 ############################### Separable Sum ##################################
 # what about separable sums? do they give rise to kronecker sums? yes!
-struct SeparableSum{T, K<:Tuple{Vararg{AbstractKernel}}} <: AbstractKernel{T}
+# useful for "Additive Gaussian Processes" - Duvenaud 2011
+# https://papers.nips.cc/paper/2011/file/4c5bde74a8f110656874902f07378009-Paper.pdf
+# IDEA: could introduce have AdditiveKernel with "order" argument, that adds higher order interactions
+struct SeparableSum{T, K} <: AbstractKernel{T}
     args::K # kernel for input covariances
-    function SeparableSum(k::Tuple{Vararg{AbstractKernel}})
-        T = promote_type(eltype.(k)...)
-        new{T, typeof(k)}(k)
-    end
 end
 @functor SeparableSum
 
-function (K::SeparableSum)(x::AbstractVector, y::AbstractVector)
-    checklength(x, y)
-    val = zero(eltype(K))
-    for (i, k) in enumerate(K.args)
-        val += k(x[i], y[i])
+SeparableSum(k...) = SeparableSum(k)
+function SeparableSum(k::Union{Tuple, AbstractVector})
+    T = promote_type(eltype.(k)...)
+    SeparableSum{T, typeof(k)}(k)
+end
+
+function (k::SeparableSum)(x::AbstractVector, y::AbstractVector)
+    d = checklength(x, y)
+    length(k.args) == d || throw(DimensionMismatch("SeparableProduct needs d = $d kernels but has r = $(length(k.args))"))
+    val = one(gramian_eltype(k, x, y))
+    @inbounds @simd for i in eachindex(k.args)
+        ki = k.args[i]
+        val += ki(x[i], y[i])
     end
     return val
 end
 
-function gramian(K::SeparableSum, X::LazyGrid, Y::LazyGrid)
-    ⊕((gramian(kxy...) for kxy in zip(K.args, X.args, Y.args))...)
-end
+# IDEA: does gramian have special structure, like kronecker sum?
+# function gramian(k::SeparableSum, X::LazyGrid, Y::LazyGrid)
+#     # ⊕((gramian(kxy...) for kxy in zip(K.args, X.args, Y.args))...)
+#     x_lengths = [length(x) for x in X.args]
+#     y_lengths = [length(y) for y in Y.args]
+#     G = zeros(length(X), length(Y))
+#     for i in eachindex(k.args)
+#         ki, xi, yi = k.args[i], X.args[i], Y.args[i]
+#         G .+= kron(gramian(ki, xi, yi))
+#     end
+#     return G
+# end
 
 # convenient constructor
 # e.g. separable(*, k1, k2)
-separable(::typeof(*), k::AbstractKernel...) = SeparableProduct(k)
-separable(::typeof(+), k::AbstractKernel...) = SeparableSum(k)
+separable(::typeof(*), k...) = SeparableProduct(k)
+separable(::typeof(+), k...) = SeparableSum(k)
 # d-separable product of k
-function separable(::typeof(^), k::AbstractKernel, d::Integer)
-    SeparableProduct(tuple((k for _ in 1:d)...))
-end
+separable(::typeof(^), k::AbstractKernel, d::Int) = SeparableProduct(Fill(k, d))

@@ -167,6 +167,10 @@ function gradient_kernel(k, x, y, ::StationaryLinearFunctionalInput)
     LinearFunctionalGradientKernelElement{T}(k, x, y)
 end
 
+function evaluate_block!(Gij, k::GradientKernel, x, y, IT = input_trait(k))
+    gradient_kernel!(Gij, k.k, x, y, IT)
+end
+
 ############################# Constant Kernel ##################################
 # efficient specialization for constants
 # IDEA: have special constant input trait, since it can combine with any kernel
@@ -471,11 +475,11 @@ function value_gradient_kernel!(K::DerivativeKernelElement, k, x, y, T::Isotropi
     return K
 end
 
-# need this to work with BlockFactorizations, see blockmul! in gramian
-# function evaluate_block!(K::DerivativeKernelElement, G::ValueGradientKernel,
-#             x, y, T::InputTrait = input_trait(G.k))
-#     value_gradient_kernel!(K, G.k, x, y, T)
-# end
+# need this to work efficiently with BlockFactorizations, see blockmul! in gramian
+# reuses temporary storage in Gij, speeds up MVM by more than an order of magnitude
+function evaluate_block!(Gij::DerivativeKernelElement, k::ValueGradientKernel, x, y, IT::InputTrait = input_trait(k))
+    value_gradient_kernel!(Gij, k.k, x, y, IT)
+end
 
 ################################################################################
 # for 1d inputs

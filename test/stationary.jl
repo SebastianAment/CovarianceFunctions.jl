@@ -34,7 +34,7 @@ const tol = 1e-12
 @testset "basic properties" begin
     T = Float64
     n = 16
-    x = randn(T, n)
+    x = randn(T, n) # IDEA: include higher-dimensional test cases
     Σ = zeros(T, (n, n))
     r² = sum(abs2, x[1] - x[2])
     for k in iso_k_arr

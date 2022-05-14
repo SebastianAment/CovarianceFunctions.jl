@@ -1,8 +1,15 @@
 ##################### Lazy multi-dimensional grid ##############################
 # useful to automatically detect Kronecker structure in Kernel matrices
-struct LazyGrid{T, V<:Tuple{Vararg{AbstractVecOrMat{T}}}} <: AbstractVector{Vector{T}}
+struct LazyGrid{T, V} <: AbstractVector{Vector{T}}
     args::V
 end
+function LazyGrid(args)
+    T = promote_type(eltype.(args)...)
+    LazyGrid{T, typeof(args)}(args)
+end
+LazyGrid(args...) = LazyGrid(args)
+LazyGrid(x::AbstractArray, d::Int) = LazyGrid(Fill(x, d))
+
 Base.length(G::LazyGrid) = prod(length, G.args)
 Base.eltype(G::LazyGrid{T}) where {T} = Vector{T}
 Base.size(G::LazyGrid) = (length(G),)
@@ -49,8 +56,3 @@ function Base.getindex(G::LazyGrid{T}, i::Integer, rowmajor::Val{true}) where {T
     end
     return val
 end
-
-LazyGrid{T}(args) where {T} = LazyGrid{T, typeof(args)}(args)A
-LazyGrid(args) = LazyGrid{Float64}(args)
-grid(args::Tuple) = LazyGrid(args)
-grid(args::AbstractArray...) = grid(args)

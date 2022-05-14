@@ -6,7 +6,7 @@ using CovarianceFunctions: AbstractKernel, IsotropicKernel, ismercer, isstationa
 
 using CovarianceFunctions
 using CovarianceFunctions: Constant, EQ, RQ, Exp, γExp, Delta, Cosine, MaternP, Matern #, SM
-using CovarianceFunctions: separable, gramian, grid
+using CovarianceFunctions: separable, gramian, LazyGrid
 using KroneckerProducts: KroneckerProduct
 
 # TODO:
@@ -68,18 +68,32 @@ using KroneckerProducts: KroneckerProduct
 end
 
 @testset "separable kernels" begin
-    k = CovarianceFunctions.EQ()
-    k = separable(*, k, k, k)
-    h = separable(^, CovarianceFunctions.EQ(), 3)
-    @test typeof(k) == typeof(h)
-    x = randn(3)
-    g = grid(x, x, x)
-    @test gramian(k, g) isa KroneckerProduct
+    n = 4
+    d = 3
+    a, b = randn(d), randn(d)
+    x = randn(n)
+    gx = LazyGrid(x, d)
+    y = randn(2n) # this applies the second kernel
+    gy = LazyGrid(y, d)
 
-    y = randn(3, 4)
-    g = grid(x, y)
-    G = gramian(k, g)
+    k = CovarianceFunctions.EQ()
+    p3 = separable(*, (k for _ in 1:d)...)
+    @test p3(a, b) ≈ separable(^, k, d)(a, b)
+    @test gramian(p3, gx, gy) isa KroneckerProduct
+    @test size(gramian(p3, gx, gy)) == (n^d, (2n)^d)
+
+    @test p3(a, b) ≈ k(a, b) # since EQ is separable in dimension
+
+    G = gramian(p3, gx, gy)
     @test G isa KroneckerProduct
+    @test Matrix(G) ≈ p3.(gx, permutedims(gy))
+
+    # separable sum
+    s3 = separable(+, k, k, k)
+    Gs3 = gramian(s3, gx, gy)
+    @test Gs3 isa Gramian
+    @test Matrix(Gs3) ≈ s3.(gx, permutedims(gy))
+
 end
 
 end # TestAlgebra

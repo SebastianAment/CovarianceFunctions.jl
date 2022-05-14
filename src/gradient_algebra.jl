@@ -1,5 +1,5 @@
 ############################ Gradient Algebra ##################################
-################################# Sum ##########################################
+################################### Sum ########################################
 # allocates space for gradient kernel evaluation but does not evaluate
 # the separation from evaluation is useful for ValueGradientKernel
 function gradient_kernel(k::Sum, x, y, ::GenericInput)
@@ -27,7 +27,7 @@ function allocate_gradient_kernel(k::Product, x, y, ::GenericInput)
                 )
     U = zeros(T, (d, r)) # storage for Jacobian
     V = zeros(T, (d, r))
-    C = Woodbury(I(r), ones(r), ones(r)', -1)
+    C = Woodbury((-I)(r), ones(r), ones(r)')
     W = Woodbury(A, U, C, V')
 end
 function gradient_kernel(k::Product, x, y, ::GenericInput)
@@ -44,19 +44,34 @@ end
 # end
 function gradient_kernel!(W::Woodbury, k::Product, x::AbstractVector, y::AbstractVector, ::GenericInput = input_trait(k))
     A = W.A # this is a LazyMatrixSum of LazyMatrixProducts
-    ForwardDiff.jacobian!(W.U, z->k(z, y), x)
-    ForwardDiff.jacobian!(W.V', z->k(x, z), y)
-    k_j = [h(x, y) for h in k.args]
-    k_j .= prod(k_j) ./ k_j
+    prod_k_j = k(x, y)
+
+    # k_vec(x, y) = [h(x, y) for h in k.args] # include in loop
+    # ForwardDiff.jacobian!(W.U', z->k_vec(z, y), x) # this is actually less allocating than the gradient! option
+    # ForwardDiff.jacobian!(W.V, z->k_vec(x, z), y)
+
     r = length(k.args)
-    for i in 1:r
+    for i in 1:r # parallelize this?
         h, H = k.args[i], A.args[i]
+        hxy = h(x, y)
         D = H.args[1]
-        @. D.diag = k_j
+        D.diag .= prod_k_j / hxy
         H.args[2] = gradient_kernel!(H.args[2], h, x, y, input_trait(h))
+
+        ui, vi = @views W.U[:, i], W.V[i, :]
+        ForwardDiff.gradient!(ui, z->h(z, y), x)
+        ForwardDiff.gradient!(vi, z->h(x, z), y) # these are bottlenecks
+        @. ui *= prod_k_j / hxy
+        @. vi /= hxy
     end
     return W
 end
+
+# IDEA: specialize first_gradient!(g, k, x, y) = ForwardDiff.gradient!(g, z->k(z, y), x)
+# function first_gradient!(g, k, x, y, ::IsotropicInput)
+# r² = sum(abs2, difference(x, y))
+#   g .= derivative(k, r²)
+# end
 
 ############################# Separable Product ################################
 # for product kernel with generic input
@@ -68,18 +83,29 @@ function allocate_gradient_kernel(k::SeparableProduct, x::AbstractVector{<:Numbe
     A = LazyMatrixProduct(Diagonal(zeros(T, d)), Diagonal(zeros(T, d)))
     U = Diagonal(zeros(T, d))
     V = Diagonal(zeros(T, d))
-    C = Woodbury(I(r), ones(r), ones(r)', -1)
+    r = length(k.args)
+    d == r || throw(DimensionMismatch("d = $d ≠ $r = r where r is number of product kernel constituents"))
+    C = Woodbury((-1I)(r), ones(r), ones(r)')
     Woodbury(A, U, C, V)
+end
+function gradient_kernel(k::SeparableProduct, x, y, ::GenericInput)
+    W = allocate_gradient_kernel(k, x, y, GenericInput())
+    gradient_kernel!(W, k, x, y, GenericInput())
 end
 
 function gradient_kernel!(W::Woodbury, k::SeparableProduct, x::AbstractVector, y::AbstractVector, ::GenericInput = input_trait(k))
     A = W.A # this is a LazyMatrixProducts of Diagonals
+    prod_k_j = k(x, y)
     D, H = A.args # first is scaling matrix by leave_one_out_products, second is diagonal of derivative kernels
     for (i, ki) in enumerate(k.args)
         xi, yi = x[i], y[i]
-        D.diag[i, i] = ki(xi, yi)
+        kixy = ki(xi, yi)
+        # D[i, i] = prod_k_j / kixy
+        D[i, i] = ki(xi, yi)
         W.U[i, i] = ForwardDiff.derivative(z->ki(z, yi), xi)
         W.V[i, i] = ForwardDiff.derivative(z->ki(xi, z), yi)
+        W.U[i, i] *= prod_k_j / kixy
+        W.V[i, i] /= kixy
         H[i, i] = DerivativeKernel(ki)(xi, yi)
     end
     leave_one_out_products!(D.diag)

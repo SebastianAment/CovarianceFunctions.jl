@@ -6,8 +6,8 @@ using BlockFactorizations
 using CovarianceFunctions
 using CovarianceFunctions: EQ, RQ, Dot, ExponentialDot, NN, GradientKernel,
         ValueGradientKernel, DerivativeKernel, ValueDerivativeKernel, input_trait,
-        LazyMatrixSum, DotProductGradientKernelElement
-
+        LazyMatrixSum, DotProductGradientKernelElement, SeparableProduct
+using ForwardDiff
 const AbstractMatOrFac = Union{AbstractMatrix, Factorization}
 
 @testset "input trait property" begin
@@ -31,6 +31,7 @@ const AbstractMatOrFac = Union{AbstractMatrix, Factorization}
 end
 
 @testset "gradient algebra" begin
+    # TODO: test for ValueGradientKernel
     # test data
     d, n = 3, 7
     X = randn(d, n)
@@ -62,7 +63,20 @@ end
     @test K*a ≈ Mkk*a + Mkh*a
     @test K*a ≈ Kk*a + Kh*a
 
-    # TODO: Chained, VerticalScaling, Warped, SeparableSum, SeparableProduct, Product
+    x, y = X[:, 1], X[:, 2]
+    # could add k+h
+    # TODO: Chained, VerticalScaling, Warped, SeparableSum, SeparableProduct
+    algebraic_combinations = [k * h, SeparableProduct(k, h, k)]
+    for kh in algebraic_combinations
+        # testing product gradient kernel
+        G = GradientKernel(kh)
+        kh_control = (x, y) -> (kh)(x, y)
+        G_control = GradientKernel(kh_control)
+        Gxy = G(x, y)
+        Gxy_control = G_control(x, y)
+        @test typeof(Gxy) != typeof(Gxy_control) # means special structure was discovered
+        @test Matrix(Gxy) ≈ Gxy_control
+    end
 end
 
 end

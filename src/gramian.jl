@@ -27,7 +27,7 @@ Base.eltype(G::Gramian{T}) where {T} = T
 # size of an element of a matrix of matrices
 elsize(G::Gramian) = size(G[1, 1])
 elsize(G::Gramian{<:Number}) = ()
-function gramian_eltype(k::MercerKernel, x, y)
+function gramian_eltype(k::AbstractKernel, x, y)
     promote_type(eltype(k), eltype(eltype(x)), eltype(eltype(y)))
 end
 gramian_eltype(k, x, y) = typeof(k(x, y)) # default to evaluation
