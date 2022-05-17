@@ -1,19 +1,22 @@
 ############################# kernel algebra ###################################
-# IDEA: separable sum gramian
-# IDEA: (Separable) Sum and Product could be one definition with meta programming
+# NOTE: output type inference of product, sum, and power not supported for
+# user-defined kernels unless Base.eltype is defined for them
 ################################ Product #######################################
-# TODO: constructors which merge products and sums
-struct Product{T, AT<:Tuple{Vararg{AbstractKernel}}} <: AbstractKernel{T}
+# IDEA: constructors which merge products and sums
+struct Product{T, AT<:Union{Tuple, AbstractVector}} <: AbstractKernel{T}
     args::AT
-    function Product(k::Tuple{Vararg{AbstractKernel}})
-        T = promote_type(eltype.(k)...)
-        new{T, typeof(k)}(k)
-    end
+    # input_traits : # could keep track of input_trait.(args)
+    # input_trait # could keep track of the overall input trait
 end
 @functor Product
-(P::Product)(τ) = prod(k->k(τ), P.args) # TODO could check for isotropy here
+function Product(k::Union{Tuple, AbstractVector})
+    T = promote_type(eltype.(k)...)
+    Product{T, typeof(k)}(k)
+end
+Product(k...) = Product(k)
+(P::Product)(τ) = prod(k->k(τ), P.args) # IDEA could check for isotropy here
 (P::Product)(x, y) = prod(k->k(x, y), P.args)
-# (P::Product)(x, y) = isstationary(P) ? P(difference(x, y)) : prod(k->k(x, y), P.args)
+# (P::Product)(x, y) = isisotropic(P) ? P(difference(x, y)) : prod(k->k(x, y), P.args)
 Product(k::AbstractKernel...) = Product(k)
 Product(k::AbstractVector{<:AbstractKernel}) = Product(k...)
 Base.prod(k::AbstractVector{<:AbstractKernel}) = Product(k)
@@ -23,20 +26,21 @@ Base.:*(c::Number, k::AbstractKernel) = Constant(c) * k
 Base.:*(k::AbstractKernel, c::Number) = Constant(c) * k
 
 ################################### Sum ########################################
-struct Sum{T, AT<:Tuple{Vararg{AbstractKernel}}} <: AbstractKernel{T}
+struct Sum{T, AT<:Union{Tuple, AbstractVector}} <: AbstractKernel{T}
     args::AT
-    function Sum(k::Tuple{Vararg{AbstractKernel}})
-        T = promote_type(eltype.(k)...)
-        new{T, typeof(k)}(k)
-    end
+    # input_trait # could keep track of the overall input trait
 end
 @functor Sum
+function Sum(k::Union{Tuple, AbstractVector})
+    T = promote_type(eltype.(k)...)
+    Sum{T, typeof(k)}(k)
+end
+Sum(k...) = Sum(k)
 (S::Sum)(τ) = sum(k->k(τ), S.args) # should only be called if S is stationary
 (S::Sum)(x, y) = sum(k->k(x, y), S.args)
 # (S::Sum)(τ) = isstationary(S) ? sum(k->k(τ), S.args) : error("One argument evaluation not possible for non-stationary kernel")
 # (S::Sum)(x, y) = isstationary(S) ? S(difference(x, y)) : sum(k->k(x, y), S.args)
-Sum(k::AbstractKernel...) = Sum(k)
-Sum(k::AbstractVector{<:AbstractKernel}) = Sum(k...)
+Sum(k...) = Sum(k)
 Base.sum(k::AbstractVector{<:AbstractKernel}) = Sum(k)
 
 Base.:+(k::AbstractKernel...) = Sum(k)
@@ -44,11 +48,16 @@ Base.:+(k::AbstractKernel, c::Number) = k + Constant(c)
 Base.:+(c::Number, k::AbstractKernel) = k + Constant(c)
 
 ################################## Power #######################################
-struct Power{T, K<:AbstractKernel{T}, PT} <: AbstractKernel{T}
+struct Power{T, K<:AbstractKernel} <: AbstractKernel{T}
     k::K
-    p::PT
+    p::Int
+    # input_trait # could keep track of the overall input trait
 end
 @functor Power
+function Power(k, p::Int)
+    T = promote_type(eltype(k))
+    Power{T, typeof(k)}(k, p)
+end
 (P::Power)(τ) = P.k(τ)^P.p
 (P::Power)(x, y) = P.k(x, y)^P.p
 Base.:^(k::AbstractKernel, p::Number) = Power(k, p)
@@ -57,6 +66,7 @@ Base.:^(k::AbstractKernel, p::Number) = Power(k, p)
 # product kernel, but separately evaluates component kernels on different parts of the input
 struct SeparableProduct{T, K} <: AbstractKernel{T}
     args::K # kernel for input covariances
+    # input_trait # could keep track of the overall input trait
 end
 @functor SeparableProduct
 SeparableProduct(k...) = SeparableProduct(k)

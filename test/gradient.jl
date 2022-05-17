@@ -7,7 +7,7 @@ using CovarianceFunctions
 using CovarianceFunctions: EQ, RQ, Dot, ExponentialDot, NN, Matern, MaternP,
         Lengthscale, input_trait, GradientKernel, ValueGradientKernel, GradientKernelElement,
         DerivativeKernel, ValueDerivativeKernel, DerivativeKernelElement, Cosine,
-        Woodbury, LazyMatrixProduct, ConstantKernel
+        Woodbury, LazyMatrixProduct, Constant
 
 const AbstractMatOrFac = Union{AbstractMatrix, Factorization}
 
@@ -78,7 +78,7 @@ const AbstractMatOrFac = Union{AbstractMatrix, Factorization}
         @test W*a ≈ G*a
 
         # testing constant kernel
-        c = ConstantKernel(1)
+        c = Constant(1)
         g = GradientKernel(c)
         @test g(x, y) ≈ zeros(d, d)
     end

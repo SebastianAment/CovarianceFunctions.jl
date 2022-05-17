@@ -12,24 +12,22 @@
 ############################# constant kernel ##################################
 # can be used to rescale existing kernels
 # IDEA: Allow Matrix-valued constant
-struct ConstantKernel{T} <: IsotropicKernel{T}
+struct Constant{T} <: IsotropicKernel{T}
     c::T
-    function ConstantKernel(c, check::Bool = true)
+    function Constant(c, check::Bool = true)
         if check && !ispsd(c)
             throw(DomainError("Constant is not positive semi-definite: $c"))
         end
         new{typeof(c)}(c)
     end
 end
-@functor ConstantKernel
-const Constant = ConstantKernel
-
 # isisotropic(::Constant) = true
 # ismercer(k::Constant) = ispsd(k.c)
 # Constant(c) = Constant{typeof(c)}(c)
 
 # should type of constant field and r agree? what promotion is necessary?
 # do we need the isotropic/ stationary evaluation, if we overwrite the mercer one?
+(k::Constant)() = k.c
 (k::Constant)(r²) = k.c # stationary / isotropic
 (k::Constant)(x, y) = k.c # mercer
 
@@ -196,8 +194,9 @@ end
 struct CosineKernel{T, V<:Union{T, AbstractVector{T}}} <: StationaryKernel{T}
     c::V
 end
+@functor CosineKernel
 const Cosine = CosineKernel
-@functor Cosine
+const Cos = Cosine
 
 # IDEA: trig-identity -> low-rank gramian
 # NOTE: this is the only stationary non-isotropic kernel so far

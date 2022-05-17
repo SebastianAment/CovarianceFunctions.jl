@@ -49,29 +49,24 @@ function gradient_kernel!(W::Woodbury, k::Product, x::AbstractVector, y::Abstrac
     # k_vec(x, y) = [h(x, y) for h in k.args] # include in loop
     # ForwardDiff.jacobian!(W.U', z->k_vec(z, y), x) # this is actually less allocating than the gradient! option
     # ForwardDiff.jacobian!(W.V, z->k_vec(x, z), y)
-
+    # GradientConfig() # for generic version, this could be pre-computed for efficiency gains
     r = length(k.args)
     for i in 1:r # parallelize this?
         h, H = k.args[i], A.args[i]
         hxy = h(x, y)
         D = H.args[1]
         D.diag .= prod_k_j / hxy
+        # input_trait(h) could be pre-computed, or should not be passed here, because the factors might be composite kernels themselves
         H.args[2] = gradient_kernel!(H.args[2], h, x, y, input_trait(h))
 
         ui, vi = @views W.U[:, i], W.V[i, :]
-        ForwardDiff.gradient!(ui, z->h(z, y), x)
-        ForwardDiff.gradient!(vi, z->h(x, z), y) # these are bottlenecks
+        ForwardDiff.gradient!(ui, z->h(z, y), x) # these are bottlenecks
+        ForwardDiff.gradient!(vi, z->h(x, z), y) # TODO: replace by value_gradient_covariance!
         @. ui *= prod_k_j / hxy
         @. vi /= hxy
     end
     return W
 end
-
-# IDEA: specialize first_gradient!(g, k, x, y) = ForwardDiff.gradient!(g, z->k(z, y), x)
-# function first_gradient!(g, k, x, y, ::IsotropicInput)
-# r² = sum(abs2, difference(x, y))
-#   g .= derivative(k, r²)
-# end
 
 ############################# Separable Product ################################
 # for product kernel with generic input

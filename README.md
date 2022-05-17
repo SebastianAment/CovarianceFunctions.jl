@@ -94,8 +94,16 @@ custom_rbf(x, y) = exp(-sum(abs2, x .- y)) # custom RBF implementation
 ```
 To take advantage of some specialized structure-aware algorithms, it is prudent to let CovarianceFunctions.jl know about the input type, in this case
 ```julia
-input_trait(::typeof(custom_rbf)) = IsotropicInput()
+CovarianceFunctions.input_trait(::typeof(custom_rbf)) = IsotropicInput()
 ```
+Other possible options include `DotProductInput` or `StationaryLinearFunctionalInput`.
+To enable efficient output type inference for custom kernels with parameters,
+extend `Base.eltype`.
+Since the custom kernel above does not have any parameters, we set the type to the bottom type `Union{}`:
+```julia
+Base.eltype(k::typeof(custom_rbf)) = Union{}
+```
+The type of the output of the kernel `k` with inputs `x` and `y` is then expected to be `promote_type(eltype.((k, x, y))...)`.
 
 ## Toeplitz Structure
 

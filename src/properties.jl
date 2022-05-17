@@ -51,7 +51,7 @@ function input_trait(S::ProductsAndSums)
         trait = input_trait(S.args[i]) # first non-constant kernel
         for j in i+1:length(S.args)
             k = S.args[j]
-            if k isa Constant
+            if k isa Constant # ignore constants, since they can function as any input type
                 continue
             elseif input_trait(k) != trait # if the non-constant kernels don't have the same input type,
                 return GenericInput() # we default back to GenericInput

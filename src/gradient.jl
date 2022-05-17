@@ -442,6 +442,18 @@ function value_gradient_kernel(k, x, y, T::InputTrait = input_trait(G.k))
     value_gradient_kernel!(K, k, x, y, T)
 end
 
+# IDEA: specialize first_gradient!(g, k, x, y) = ForwardDiff.gradient!(g, z->k(z, y), x)
+# computes covariance between value and gradient
+# function value_gradient_covariance!(gx, gy, k, x, y, ::IsotropicInput)
+#     r² = sum(abs2, difference(x, y))
+#     g .= derivative(k, r²)
+# end
+#
+# function value_gradient_covariance!(gx, gy, k, x, y, ::GenericInput())
+#     r² = sum(abs2, difference(x, y))
+#     g .= derivative(k, r²)
+# end
+
 # IDEA: specialize evaluate for IsotropicInput, DotProductInput
 # returns block matrix
 function value_gradient_kernel!(K::DerivativeKernelElement, k, x, y, T::InputTrait)
