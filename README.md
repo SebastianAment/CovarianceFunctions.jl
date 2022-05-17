@@ -16,7 +16,7 @@ Feature highlights include
 - [Toeplitz structure](#toeplitz-structure): `O(n⋅log(n))` exact MVMs and `O(n²)` exact linear solves with isotropic kernel matrices on a uniform grid.
 - [Kronecker structure](#kronecker-structure): `O(nᵈ⁺¹)` exact MVMs and `O(nᵈ⁺²)` exact linear solves with separable product kernels matrices on a Cartesian grid in `d` dimensions.
 - [Barnes-Hut algorithm](#barnes-hut): `O(n⋅log(n))` approximate MVMs with isotropic kernel matrices.
-- [Sparsification](#sparsification): `O(n⋅log(n))` sparsification of isotropic kernel matrices with subsequent `O(k)` MVMs, where `k` is the number of non-zeros.
+- [Sparsification](#sparsification): `O(nk⋅log(n))` sparsification of isotropic kernel matrices to specified tolerance with subsequent `O(k)` MVMs, where `k` is the number of non-zeros.
 
 ## Basic Usage
 This example shows how to construct a kernel matrix using the `gramian` function and highlights the small memory footprint of the lazy representation and the matrix-vector multiplication with `mul!`.
@@ -189,9 +189,23 @@ size(G)
   0.062468 seconds (97 allocations: 96.005 MiB)
 ```
 That is, factorizing `G` and solving `F \ a` takes a fraction of a second, despite the linear system having more than **2 million** variables.
+
+Notably, both the Kronecker structure and the constituent kernel matrices are
+lazily represented in the general case.
+If fast MVMs are required, it is best to instantiate the constituent matrices in memory while keeping the Kronecker product lazy:
+```julia
+using KroneckerProducts
+K = kronecker(Matrix, G) # this instantiates the constituent kernel matrices in memory for fast MVMs
+a = randn(n^d);
+b = zero(a);
+@time mul!(b, K, a);
+  0.022626 seconds (50 allocations: 2.016 KiB)
+```
+
 Further, note that Kronecker structure can be combined with the [Toeplitz structure](#toeplitz-structure) above to yield
-`O(dn⋅log(n))` MVMs with the resulting kernel matrix.
+quasi-linear MVMs with the resulting kernel matrix.
 This is the basis of the [SKI framework](https://arxiv.org/pdf/1503.01057.pdf).
+
 
 ## Gradient Kernels
 
@@ -309,6 +323,11 @@ Depending on the data distribution, kernel matrices associated with exponentiall
 This is particularly likely in higher dimensions, since the average distance of uniformaly distributed points in e.g. the unit hyper-cube grows with the dimension.
 CovarianceFunctions.jl contains a sparsification algorithm that extends SparseArrays.jl's `sparse` function,
 guaranteeing a user-defined element-wise accuracy.
+
+>:warning: Sparsification does not guarnatee positive definiteness of the resulting matrices. Special care should be taken when working with this method. We thank [David Bindel](https://www.cs.cornell.edu/~bindel/) for pointing this out.
+
+>:warning: The bottleneck in the computation of the sparse `S` is NearestNeighbors.jl's `inrange` function. While in principle the nearest neighbors search based on ball trees is an `O(n⋅log(n))` operation, the complexity grows with the *intrinsic* dimension of the data. Consequently, the search is fast for data on a low-dimensional manifold, but a brute-force search could be more efficient for unstructured data in high dimensions. It is possible to further [accelerate the search through parallelization](https://github.com/KristofferC/NearestNeighbors.jl/pull/131).
+
 ```julia
 using CovarianceFunctions
 using SparseArrays
@@ -341,16 +360,14 @@ while the lazy dense multiply takes three orders of magnitude longer:
 @time mul!(b, G, a); # lazy dense multiply
   0.949835 seconds (61 allocations: 5.594 KiB)
 ```
-The bottleneck in the computation of `S` is NearestNeighbors.jl's `inrange` function.
-While in principle the nearest neighbors search is an `O(n⋅log(n))` operation,
-the complexity grows exponentially with the intrinsic dimension of the data.
-We believe that it is possible to further [accelerate this computation through parallelization](https://github.com/KristofferC/NearestNeighbors.jl/pull/131).
 Note that the sparsification in this case takes as much time as 7 lazy dense multiplications, and would therefore break even quickly if an iterative method is used.
 
 ## Barnes-Hut
 The Barnes-Hut algorithm has its origins in accelerating gravity simulutations, but a variant of it can be applied to kernel matrices arising from more general kernels,
 allowing for an approximate matrix-vector multiply in `O(n⋅log(n)⋅d)` operations.
 CovarianceFunctions.jl contains the `BarnesHutFactorization` structure whose constructor can be called on a `Gramian` matrix and applies the fast transform whenever `*` or `mul!` is called.
+
+>:warning: Similar to the fast sparsification above, the Barnes-Hut algorithm relies on ball trees to summarize interactions between clusters of data points. While this is guaranteed to be fast for low-dimensional (`d≤3`) data, the complexity of the approach increases with the *intrinsic* dimension of the data.
 
 ```julia
 using CovarianceFunctions

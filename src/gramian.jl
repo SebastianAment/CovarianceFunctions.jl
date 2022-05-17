@@ -73,6 +73,8 @@ function Base.:*(G::Gramian, A::AbstractMatrix)
     B = zeros(T, size(G, 1), size(A, 2))
     mul!(B, G, A)
 end
+# NOTE: these specialized multiplication functions scale better for large n
+# but tend to be slightly slower than Julia's generic mul! for small n, likely because of parallelization
 function LinearAlgebra.mul!(y::AbstractVector, G::Gramian, x::AbstractVector, α::Real = 1, β::Real = 0)
     n, m = size(G)
     y .*= β
@@ -88,7 +90,7 @@ function LinearAlgebra.mul!(Y::AbstractMatrix, G::Gramian, X::AbstractMatrix, α
     Y .*= β
     @threads for j in 1:size(Y, 2)
         for i in 1:size(Y, 1)
-            @simd for k in 1:size(X, 1)
+            @simd for k in 1:size(X, 1) # indexing order so that dense arrays Y, X are indexed in a Cache-friendly way
                 @inbounds Y[i, j] += α * G[i, k] * X[k, j]
             end
         end
