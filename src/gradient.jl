@@ -431,39 +431,32 @@ function (G::ValueGradientKernel)(x, y)
     value_gradient_kernel(G.k, x, y, input_trait(G.k))
 end
 
-function value_gradient_kernel(k, x, y, T::InputTrait = input_trait(G.k))
+function value_gradient_kernel(k, x, y, IT::InputTrait = input_trait(G.k))
     d = length(x)
     kxy = k(x, y)
     value_value = kxy
-    value_gradient = MVector{d, typeof(kxy)}(undef)
-    gradient_value = MVector{d, typeof(kxy)}(undef)
-    gradient_gradient = gradient_kernel(k, x, y, T)
+    value_gradient = zeros(typeof(kxy), d)
+    gradient_value = zeros(typeof(kxy), d)
+    gradient_gradient = gradient_kernel(k, x, y, IT)
     K = DerivativeKernelElement(value_value, value_gradient, gradient_value, gradient_gradient)
-    value_gradient_kernel!(K, k, x, y, T)
+    value_gradient_kernel!(K, k, x, y, IT)
 end
 
-# IDEA: specialize first_gradient!(g, k, x, y) = ForwardDiff.gradient!(g, z->k(z, y), x)
-# computes covariance between value and gradient
-# function value_gradient_covariance!(gx, gy, k, x, y, ::IsotropicInput)
-#     r² = sum(abs2, difference(x, y))
-#     g .= derivative(k, r²)
-# end
-#
-# function value_gradient_covariance!(gx, gy, k, x, y, ::GenericInput())
-#     r² = sum(abs2, difference(x, y))
-#     g .= derivative(k, r²)
-# end
-
-# IDEA: specialize evaluate for IsotropicInput, DotProductInput
-# returns block matrix
-function value_gradient_kernel!(K::DerivativeKernelElement, k, x, y, T::InputTrait)
+# IDEA: for Sum and Product kernels, if input_trait is not passed, could default to Generic
+# No, should keep track of input type in kernel
+function value_gradient_kernel!(K::DerivativeKernelElement, k, x, y)
+    value_gradient_kernel!(K, k, x, y, input_trait(k))
+end
+function value_gradient_kernel!(K::DerivativeKernelElement, k, x, y, IT::InputTrait)
     K.value_value = k(x, y)
-    K.value_gradient .= ForwardDiff.gradient(z->k(x, z), y) # ForwardDiff.gradient!(r, z->k(z, y), x)
-    K.gradient_value .= ForwardDiff.gradient(z->k(z, y), x)
-    K.gradient_gradient = gradient_kernel!(K.gradient_gradient, k, x, y, T)
+    value_gradient_covariance!(K.gradient_value, K.value_gradient, k, x, y, IT)
+    K.gradient_gradient = gradient_kernel!(K.gradient_gradient, k, x, y, IT)
     return K
 end
 
+# NOTE: since value_gradient_covariance! was added, specializations of value_gradient_kernel!
+# only yield marginal performance improvements (<2x)
+# could be removed to reduce LOC
 function value_gradient_kernel!(K::DerivativeKernelElement, k, x, y, T::DotProductInput)
     xy = dot(x, y)
     k0, k1 = value_derivative(k, xy)
@@ -491,6 +484,76 @@ end
 # reuses temporary storage in Gij, speeds up MVM by more than an order of magnitude
 function evaluate_block!(Gij::DerivativeKernelElement, k::ValueGradientKernel, x, y, IT::InputTrait = input_trait(k))
     value_gradient_kernel!(Gij, k.k, x, y, IT)
+end
+
+################################################################################
+# computes covariance between value and gradient, needed for value-gradient kernel
+# technically, complexity would be O(d) even with generic implementation
+# in practice, at least an order of magitude can be gained by specialized implementations
+function value_gradient_covariance!(gx, gy, k, x, y, ::GenericInput)
+    # GradientConfig() # for generic version, this could be pre-computed for efficiency gains
+    ForwardDiff.gradient!(gx, z->k(z, y), x) # these are bottlenecks
+    ForwardDiff.gradient!(gy, z->k(x, z), y)
+    return gx, gy
+end
+
+function value_gradient_covariance!(gx, gy, k, x, y, ::GenericInput, α::Real, β::Real)
+    tx, ty = ForwardDiff.gradient(z->k(z, y), x), ForwardDiff.gradient(z->k(x, z), y)
+    @. gx = α * tx + β * gx
+    @. gy = α * ty + β * gy
+    return gx, gy
+end
+
+function value_gradient_covariance!(gx, gy, k::Sum, x, y, ::GenericInput, α::Real = 1, β::Real = 0)
+    @. gx *= β
+    @. gy *= β
+    for h in k.args # input_trait(h) should not be called if h is a composite kernel for higher effiency
+        value_gradient_covariance!(gx, gy, h, x, y, input_trait(h), α, 1)
+    end
+    return gx, gy
+end
+
+# this is more tricky to do without additional allocations
+# could do it with one more vector
+function value_gradient_covariance!(gx, gy, k::Product, x, y, ::GenericInput, α::Real = 1, β::Real = 0)
+    @. gx *= β
+    @. gy *= β
+    prod_k_xy = k(x, y)
+    if !iszero(prod_k_xy)
+        for i in eachindex(k.args)
+            ki = k.args[i]
+            αi = α * prod_k_xy / ki(x, y)
+            value_gradient_covariance!(gx, gy, ki, x, y, input_trait(ki), αi, 1)
+        end
+    else # GradientKernel of Product requires less efficient O(dr²) special case if prod_k_xy is zero, for now, throw error
+        throw(DomainError("value_gradient_covariance! of Product not supported for products that are zero"))
+    end
+    return gx, gy
+end
+
+function value_gradient_covariance!(gx, gy, k, x, y, ::IsotropicInput, α::Real = 1, β::Real = 0)
+    r = difference(x, y)
+    r² = sum(abs2, r)
+    k1 = ForwardDiff.derivative(k, r²) # IDEA: this computation could be pooled with the gradient computation
+    @. gx = α * 2k1 * r + β * gx
+    @. gy = -α * 2k1 * r + β * gy
+    return gx, gy
+end
+
+function value_gradient_covariance!(gx, gy, k, x, y, ::DotProductInput, α::Real = 1, β::Real = 0)
+    xy = dot(x, y)
+    k1 = ForwardDiff.derivative(k, xy) # IDEA: this computation could be pooled with the gradient computation
+    @. gx = α * k1 * y + β * gx
+    @. gy = α * k1 * x + β * gy
+    return gx, gy
+end
+
+function value_gradient_covariance!(gx, gy, k, x, y, ::StationaryLinearFunctionalInput, α::Real = 1, β::Real = 0)
+    cr = dot(k.c, difference(x, y))
+    k1 = ForwardDiff.derivative(k, cr) # IDEA: this computation could be pooled with the gradient computation
+    @. gx = α * k1 * k.c + β * gx
+    @. gy = -α * k1 * k.c + β * gy
+    return gx, gy
 end
 
 ################################################################################

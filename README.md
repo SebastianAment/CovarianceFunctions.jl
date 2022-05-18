@@ -241,8 +241,11 @@ b = zero(a);
 @time mul!(b, G, a); # multiplying with G allocates little memory
   0.394388 seconds (67 allocations: 86.516 KiB)
 ```
-Note that the last multiplication was with a **million by million matrix**,
+The last multiplication was with a **million by million matrix**,
 which would be impossible without CovarianceFunctions.jl's lazy and structured representation of the gradient kernel matrix.
+Note that `GradientKernel` only computes covariances of gradient observations,
+to get the `(d+1) × (d+1)` covariance kernel that includes value observations,
+use `ValueGradientKernel`.
 
 To highlight the scalability of this MVM algorithm, we compare against the implementation in [GPyTorch](https://docs.gpytorch.ai/en/stable/kernels.html?highlight=kernels#rbfkernelgrad) and the fast *approximate* MVM provided by [D-SKIP](https://github.com/ericlee0803/GP_Derivatives).
 

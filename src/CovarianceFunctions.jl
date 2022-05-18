@@ -27,6 +27,8 @@ using IterativeSolvers
 using ToeplitzMatrices
 using FFTW
 
+# IDEA: AbstractKernel{T, IT}, where IT isa InputType
+# then const IsotropicKernel{T} = AbstractKernel{T, IsotropicInput} ... 
 abstract type AbstractKernel{T} end
 abstract type MercerKernel{T} <: AbstractKernel{T} end
 abstract type StationaryKernel{T} <: MercerKernel{T} end

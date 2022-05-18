@@ -31,7 +31,6 @@ const AbstractMatOrFac = Union{AbstractMatrix, Factorization}
 end
 
 @testset "gradient algebra" begin
-    # TODO: test for ValueGradientKernel
     # test data
     d, n = 3, 7
     X = randn(d, n)
@@ -48,34 +47,26 @@ end
     @test MK ≈ Mkk + Mkh
 
     # sum of heterogeneous kernel types
-    k = CovarianceFunctions.EQ() # EQ
-    h = CovarianceFunctions.Dot()^2 + 1 # quadratic
-    gk, gh = GradientKernel(k), GradientKernel(h)
-    G = GradientKernel(k + h)
-    K, Kk, Kh = gramian(G, X), gramian(gk, X), gramian(gh, X)
-
-    MK, Mkk, Mkh = Matrix(K), Matrix(Kk), Matrix(Kh)
-    @test K isa BlockFactorization
-    @test K.A[1, 1] isa LazyMatrixSum
-    @test MK ≈ Mkk + Mkh
-    a = randn(d*n)
-    @test K*a ≈ MK*a
-    @test K*a ≈ Mkk*a + Mkh*a
-    @test K*a ≈ Kk*a + Kh*a
-
+    eq = CovarianceFunctions.EQ() # EQ
+    line = CovarianceFunctions.Dot() # dot
+    quad = line^2 + 1
+    cosine = CovarianceFunctions.Cosine(randn(d))
     x, y = X[:, 1], X[:, 2]
-    # could add k+h
-    # TODO: Chained, VerticalScaling, Warped, SeparableSum, SeparableProduct
-    algebraic_combinations = [k * h, SeparableProduct(k, h, k)]
-    for kh in algebraic_combinations
-        # testing product gradient kernel
-        G = GradientKernel(kh)
-        kh_control = (x, y) -> (kh)(x, y)
-        G_control = GradientKernel(kh_control)
-        Gxy = G(x, y)
-        Gxy_control = G_control(x, y)
-        @test typeof(Gxy) != typeof(Gxy_control) # means special structure was discovered
-        @test Matrix(Gxy) ≈ Gxy_control
+    # TODO: Chained, VerticalScaling, Warped, SeparableSum
+    heterogeneous_combinations = [eq + line, eq + quad, eq * cosine, eq * quad,
+                                SeparableProduct(k, h, k), line * line]
+    gradient_kernels = [GradientKernel, ValueGradientKernel]
+    for gradient_kernel in gradient_kernels
+        for kh in heterogeneous_combinations
+            # testing product gradient kernel
+            G = gradient_kernel(kh)
+            kh_control = (x, y) -> (kh)(x, y)
+            G_control = gradient_kernel(kh_control)
+            Gxy = G(x, y)
+            Gxy_control = G_control(x, y)
+            @test typeof(Gxy) != typeof(Gxy_control) # means special structure was discovered
+            @test Matrix(Gxy) ≈ Gxy_control
+        end
     end
 end
 

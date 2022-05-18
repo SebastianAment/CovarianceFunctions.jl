@@ -42,15 +42,16 @@ input_trait(::IsotropicKernel) = IsotropicInput()
 input_trait(::Union{Dot, ExponentialDot}) = DotProductInput()
 input_trait(P::Power) = input_trait(P.k)
 
+input_trait(S::Union{Product, Sum}) = S.input_trait
 # special treatment for constant kernel, since it can function for any input
-function input_trait(S::ProductsAndSums)
-    i = findfirst(x->!isa(x, Constant), S.args)
+function sum_and_product_input_trait(args)
+    i = findfirst(x->!isa(x, Constant), args)
     if isnothing(i) # all constant kernels
         return IsotropicInput()
     else
-        trait = input_trait(S.args[i]) # first non-constant kernel
-        for j in i+1:length(S.args)
-            k = S.args[j]
+        trait = input_trait(args[i]) # first non-constant kernel
+        for j in i+1:length(args)
+            k = args[j]
             if k isa Constant # ignore constants, since they can function as any input type
                 continue
             elseif input_trait(k) != trait # if the non-constant kernels don't have the same input type,
