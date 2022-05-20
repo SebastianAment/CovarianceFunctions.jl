@@ -247,6 +247,15 @@ Note that `GradientKernel` only computes covariances of gradient observations,
 to get the `(d+1) × (d+1)` covariance kernel that includes value observations,
 use `ValueGradientKernel`.
 
+For linear solves with gradient kernel matrices via `\` or `ldiv!`,
+a conjugate gradient method is used, which in this case only needs a few iterations to converge, since the Matérn kernel we used gives rise to an extremely well conditioned matrix in high dimensions:
+```julia
+@time b = G \ a;
+  0.817458 seconds (127 allocations: 32.167 MiB)
+G*b ≈ a
+  true
+```
+
 To highlight the scalability of this MVM algorithm, we compare against the implementation in [GPyTorch](https://docs.gpytorch.ai/en/stable/kernels.html?highlight=kernels#rbfkernelgrad) and the fast *approximate* MVM provided by [D-SKIP](https://github.com/ericlee0803/GP_Derivatives).
 
 <!-- <p align="center">
@@ -311,9 +320,12 @@ h = CovarianceFunctions.HessianKernel(k);
 d, n = 16, 128; # keeping dimension moderate
 x = [randn(d) for _ in 1:n]; # data is vector of vectors
 @time G = gramian(h, x); # instantiating lazy gradient kernel Gramian matrix
-0.000026 seconds (59 allocations: 54.172 KiB)
+  0.000026 seconds (59 allocations: 54.172 KiB)
 size(G) # G is n*d² by n*d²
   (32768, 32768)
+```
+MVMs with the Hessian kernel matrix are fast:
+```julia
 a = randn(n*d^2);
 b = zero(a);
 @time mul!(b, G, a); # multiplying with G is fast
@@ -328,6 +340,15 @@ This is in contrast with the naïve approach, since even instantiating the Hessi
 Notably, the multiplication with the Hessian kernel matrix scales linearly in `d²`, the amount of information gathered per Hessian observation.
 While the implementation scales well, the constants and memory allocations are at this point not as optimized as for the gradient kernel matrices.
 Feel free to reach out if you'd benefit from a further improved implementation of the Hessian kernel, and I'll fast-track it.
+
+<!-- Similar to linear solves with gradient kernel matrices,
+a conjugate gradient method is used on Hessian kernel matrices
+whenever `\` or `ldiv!` is called, leading to very efficient solves:
+```julia
+@time b = G \ a;
+G*b ≈ a
+  true
+``` -->
 
 ## Sparsification
 Depending on the data distribution, kernel matrices associated with exponentially-decaying kernels can be approximately sparse.

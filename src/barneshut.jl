@@ -79,12 +79,7 @@ function barneshut!(b::AbstractVector, F::BarnesHutFactorization{<:Number}, w::A
     eltype(b) == promote_type(eltype(F), eltype(w)) ||
             throw(TypeError("eltype of target vector b not equal to eltype of matrix-vector product: $(eltype(b)) and $(promote_type(eltype(F), eltype(w)))"))
 
-    if β == 0
-        @. b = 0 # this avoids trouble if b is initialized with NaN's, e.g. thorugh "similar"
-    else
-        @. b *= β
-    end
-
+    @. b = iszero(β) ? 0 : β * b # this avoids trouble if b is initialized with NaN's, e.g. thorugh "similar"
     if split && any(<(0), w) # if split is on, we multiply with positive and negative component of w separately, tends to increase accuracy because of center of mass calculation
         splitting_barneshut!(b, F, w, α, β, θ)
     else

@@ -9,12 +9,8 @@ function taylor!(b::AbstractVector, F::BarnesHutFactorization{<:Number}, w::Abst
     size(F, 2) == length(w) || throw(DimensionMismatch("length of w does not match second dimension of F: $(length(w)) ≠ $(size(F, 2))"))
     eltype(b) == promote_type(eltype(F), eltype(w)) ||
             throw(TypeError("eltype of target vector b not equal to eltype of matrix-vector product: $(eltype(b)) and $(promote_type(eltype(F), eltype(w)))"))
-    if β == 0
-        @. b = 0 # this avoids trouble if b is initialized with NaN's, e.g. thorugh "similar"
-    else
-        @. b *= β
-    end
 
+    @. b = iszero(β) ? 0 : β * b # this avoids trouble if b is initialized with NaN's, e.g. thorugh "similar"
     f_orders(r²) = value_derivative(F.k, r²)
     sums_w = node_sums(w, F.Tree) # IDEA: could pre-allocate
     sums_w_r = weighted_node_sums(w, F.y, F.Tree)

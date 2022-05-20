@@ -77,7 +77,7 @@ end
 # but tend to be slightly slower than Julia's generic mul! for small n, likely because of parallelization
 function LinearAlgebra.mul!(y::AbstractVector, G::Gramian, x::AbstractVector, α::Real = 1, β::Real = 0)
     n, m = size(G)
-    y .*= β
+    @. y = iszero(β) ? 0 : β * y
     @threads for i in 1:n
         @simd for j in 1:m
             @inbounds y[i] += α * G[i, j] * x[j]
@@ -87,7 +87,7 @@ function LinearAlgebra.mul!(y::AbstractVector, G::Gramian, x::AbstractVector, α
 end
 
 function LinearAlgebra.mul!(Y::AbstractMatrix, G::Gramian, X::AbstractMatrix, α::Real = 1, β::Real = 0)
-    Y .*= β
+    @. Y = iszero(β) ? 0 : β * Y # makes sure returns correctly if β = 0 and y contains NaNs, e.g. through `similar` initialization
     @threads for j in 1:size(Y, 2)
         for i in 1:size(Y, 1)
             @simd for k in 1:size(X, 1) # indexing order so that dense arrays Y, X are indexed in a Cache-friendly way
@@ -232,8 +232,8 @@ function LinearAlgebra.:\(B::BlockGramian, b::AbstractVector)
     ldiv!(x, B, b)
 end
 # solve general BlockGramian via conjugate gradient solver
-function LinearAlgebra.ldiv!(x::AbstractVector, B::BlockGramian, b::AbstractVector)
-    cg!(x, B, b)
+function LinearAlgebra.ldiv!(x::AbstractVector, B::BlockGramian, b::AbstractVector; kwargs...)
+    cg!(x, B, b; kwargs...)
 end
 
 # carries out multiplication for general BlockFactorization
@@ -241,7 +241,7 @@ function BlockFactorizations.blockmul!(y::AbstractVecOfVecOrMat, G::Gramian, x::
     Gijs = [G[1, 1] for _ in 1:Base.Threads.nthreads()] # pre-allocate storage for elements
     IT = input_trait(G.k)
     @threads for i in eachindex(y) # NOTE: without threading, this does not allocate anything
-        @. y[i] = β * y[i]
+        @. y[i] = iszero(β) ? 0 : β * y[i] # makes sure returns correctly if β = 0 and y contains NaNs, e.g. through `similar` initialization
         Gij = Gijs[Base.Threads.threadid()]
         for j in eachindex(x)
             Gij = evaluate_block!(Gij, G, i, j, IT) # this is change to original blockmul!, allowing evaluation of Gramian's elements without additional allocations

@@ -53,7 +53,7 @@ const AbstractMatOrFac = Union{AbstractMatrix, Factorization}
         end
 
         # testing matrix solve
-        for k in kernels # TODO: better conditioned NN kernel with bias
+        for k in kernels # IDEA: better conditioned NN kernel with bias
             G = GradientKernel(k)
             K = CovarianceFunctions.gramian(G, X)
             a = randn(n*d)
