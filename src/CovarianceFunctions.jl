@@ -28,7 +28,7 @@ using ToeplitzMatrices
 using FFTW
 
 # IDEA: AbstractKernel{T, IT}, where IT isa InputType
-# then const IsotropicKernel{T} = AbstractKernel{T, IsotropicInput} ... 
+# then const IsotropicKernel{T} = AbstractKernel{T, IsotropicInput} ...
 abstract type AbstractKernel{T} end
 abstract type MercerKernel{T} <: AbstractKernel{T} end
 abstract type StationaryKernel{T} <: MercerKernel{T} end
@@ -40,6 +40,8 @@ const default_tol = 1e-6 # default tolerance for matrix solves and products
 abstract type MultiKernel{T} <: AbstractKernel{T} end # MultiKernel
 # compute the (i, j)th entry of k(x, y)
 Base.getindex(K::MultiKernel, i, j) = (x, y) -> getindex(K(x, y), i, j)
+
+function gramian end
 
 # first, utility functions
 include("util.jl")

@@ -236,19 +236,21 @@ x = [randn(d) for _ in 1:n]; # data is vector of vectors
   0.000013 seconds (1 allocation: 96 bytes)
 size(G) # G is n*d by n*d
   (1048576, 1048576)
+```
+Despite the **million by million matrix**, MVMs are fast:
+```julia
 a = randn(n*d);
 b = zero(a);
 @time mul!(b, G, a); # multiplying with G allocates little memory
   0.394388 seconds (67 allocations: 86.516 KiB)
 ```
-The last multiplication was with a **million by million matrix**,
-which would be impossible without CovarianceFunctions.jl's lazy and structured representation of the gradient kernel matrix.
+This would be impossible without CovarianceFunctions.jl's lazy and structured representation of the gradient kernel matrix.
 Note that `GradientKernel` only computes covariances of gradient observations,
 to get the `(d+1) × (d+1)` covariance kernel that includes value observations,
 use `ValueGradientKernel`.
 
 For linear solves with gradient kernel matrices via `\` or `ldiv!`,
-a conjugate gradient method is used, which in this case only needs a few iterations to converge, since the Matérn kernel we used gives rise to an extremely well conditioned matrix in high dimensions:
+the minimum residual method is used, which in this case only needs a few iterations to converge, since the Matérn kernel we used gives rise to an extremely well conditioned matrix in high dimensions:
 ```julia
 @time b = G \ a;
   0.817458 seconds (127 allocations: 32.167 MiB)
@@ -298,7 +300,7 @@ g = CovarianceFunctions.GradientKernel(kernel);
 size(G) # G is n*d by n*d
   (1048576, 1048576)
 @time mul!(b, G, a);
-    2.649361 seconds (27.26 M allocations: 1.141 GiB, 2.68% gc time)
+    3.139411 seconds (8.39 M allocations: 424.829 MiB, 0.47% gc time)
 ```
 
 It is possible to hook a costum kernel into CovarianceFunctions.jl's automatic structure derivation engine, by specifying its input type

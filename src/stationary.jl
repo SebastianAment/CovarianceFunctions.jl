@@ -31,6 +31,8 @@ end
 (k::Constant)(r²) = k.c # stationary / isotropic
 (k::Constant)(x, y) = k.c # mercer
 
+gramian(k::Constant, x::AbstractVector, y::AbstractVector) = Fill(k.c, length(x), length(y))
+
 #################### standard exponentiated quadratic kernel ###################
 struct ExponentiatedQuadratic{T} <: IsotropicKernel{T} end
 const EQ{T} = ExponentiatedQuadratic{T}

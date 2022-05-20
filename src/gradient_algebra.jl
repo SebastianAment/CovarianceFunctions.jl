@@ -16,6 +16,21 @@ function gradient_kernel!(K::LazyMatrixSum, k::Sum, x::AbstractVector, y::Abstra
     return K
 end
 
+function gramian(k::GradientKernel{<:Any, <:Sum}, x::AbstractVector, y::AbstractVector)
+    gramian(k, x, y, input_trait(k))
+end
+
+# this is more efficient for global structure if the constituents are structured (saves allocations)
+function gramian(k::GradientKernel{<:Any, <:Sum}, x::AbstractVector, y::AbstractVector, ::GenericInput)
+    LazyMatrixSum((gramian(GradientKernel(ki), x, y) for ki in k.k.args)...)
+end
+
+# if all constituents have the same structue, use lazy representation
+function gramian(k::GradientKernel{<:Any, <:Sum}, x::AbstractVector, y::AbstractVector, ::InputTrait)
+    G = Gramian(k, x, y)
+    BlockFactorization(G, isstrided = true)
+end
+
 ################################ Product #######################################
 # for product kernel with generic input
 function allocate_gradient_kernel(k::Product, x, y, ::GenericInput)
@@ -23,7 +38,7 @@ function allocate_gradient_kernel(k::Product, x, y, ::GenericInput)
     H = (gradient_kernel(h, x, y, input_trait(h)) for h in k.args)
     T = typeof(k(x, y))
     A = LazyMatrixSum(
-                (LazyMatrixProduct(Diagonal(zeros(T, d)), h) for h in H)...
+                (LazyMatrixProduct([Diagonal(zeros(T, d)), h]) for h in H)...
                 )
     U = zeros(T, (d, r)) # storage for Jacobian
     V = zeros(T, (d, r))

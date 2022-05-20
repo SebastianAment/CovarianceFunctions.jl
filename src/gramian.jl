@@ -231,9 +231,9 @@ function LinearAlgebra.:\(B::BlockGramian, b::AbstractVector)
     x = zeros(T, size(B, 1))
     ldiv!(x, B, b)
 end
-# solve general BlockGramian via conjugate gradient solver
+# solve general BlockGramian via minimum residual solver
 function LinearAlgebra.ldiv!(x::AbstractVector, B::BlockGramian, b::AbstractVector; kwargs...)
-    cg!(x, B, b; kwargs...)
+    minres!(x, B, b; kwargs...)
 end
 
 # carries out multiplication for general BlockFactorization

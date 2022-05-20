@@ -23,8 +23,11 @@ end
 
 # O(d²) fallback for non-structured case
 function gradient_kernel(k, x, y, ::GenericInput)
-    K = zeros(gramian_eltype(k, x, y), length(x), length(y))
+    K = allocate_gradient_kernel(k, x, y, GenericInput())
     gradient_kernel!(K, k, x, y, GenericInput())
+end
+function allocate_gradient_kernel(k, x, y, ::GenericInput)
+    zeros(gramian_eltype(k, x, y), length(x), length(y))
 end
 
 function gradient_kernel!(K::AbstractMatrix, k, x, y, ::GenericInput)
@@ -174,12 +177,18 @@ end
 ############################# Constant Kernel ##################################
 # efficient specialization for constants
 # IDEA: have special constant input trait, since it can combine with any kernel
-function gradient_kernel(k::Constant, x, y, ::IsotropicInput)
+gradient_kernel(k::Constant, x, y, ::IsotropicInput) = gradient_kernel(k, x, y)
+gradient_kernel!(K, k::Constant, x, y, ::IsotropicInput) = gradient_kernel!(K, k, x, y)
+function gradient_kernel(k::Constant, x, y)
     Zeros(length(x), length(y))
 end
-gradient_kernel!(K::Zeros, k::Constant, x, y, ::IsotropicInput) = K
-gradient_kernel!(K::AbstractMatrix, k::Constant, x, y, ::IsotropicInput) = (K .= 0)
+gradient_kernel!(K::Zeros, k::Constant, x, y) = K
+gradient_kernel!(K::AbstractMatrix, k::Constant, x, y) = (K .= 0)
 
+function gramian(k::GradientKernel{<:Any, <:Constant}, x::AbstractVector, y::AbstractVector)
+    d = length(x[1])
+    Zeros(length(x) * d, length(y) * d)
+end
 ########################### Neural Network Kernel ##############################
 # specialization of gradient nn kernel, written before more general AD-implementation,
 # which obviates the need for special derivations like these

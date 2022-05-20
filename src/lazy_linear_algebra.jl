@@ -28,8 +28,12 @@ struct LazyMatrixProduct{T, AT, F} <: LazyFactorization{T}
     end
 end
 function LazyMatrixProduct(A::AbstractMatOrFac...; tol::Real = default_tol)
-    LazyMatrixProduct([A...]; tol = tol)
+    args_vec = vcat((lazy_product_flattened_args(Ai) for Ai in A)...)
+    args = tuple(args_vec...) # casting to tuple makes it possible to infer types
+    LazyMatrixProduct(args, tol = tol)
 end
+lazy_product_flattened_args(A) = [A]
+lazy_product_flattened_args(A::LazyMatrixProduct) = [A.args...]
 
 function Base.size(L::LazyMatrixProduct, i::Int)
     if i == 1
@@ -76,7 +80,7 @@ function LinearAlgebra.mul!(y::AbstractVecOrMat, L::LazyMatrixProduct, x::Abstra
     for A in reverse(L.args)
         z = A*z
     end
-    @. y = α*z + β*y
+    @. y = α*z + (iszero(β) ? 0 : β*y)
     return y
 end
 
@@ -94,8 +98,12 @@ struct LazyMatrixSum{T, AT, F} <: LazyFactorization{T}
     end
 end
 function LazyMatrixSum(A::AbstractMatOrFac...; tol::Real = default_tol)
-    LazyMatrixSum([A...], tol = tol)
+    args_vec = vcat((lazy_sum_flattened_args(Ai) for Ai in A)...)
+    args = tuple(args_vec...)
+    LazyMatrixSum(args, tol = tol)
 end
+lazy_sum_flattened_args(A) = [A]
+lazy_sum_flattened_args(A::LazyMatrixSum) = [A.args...]
 
 Base.size(L::LazyMatrixSum, i...) = size(L.args[1], i...)
 Base.adjoint(L::LazyMatrixSum) = LazyMatrixSum(adjoint.(L.args))
@@ -117,11 +125,21 @@ function Base.:*(L::LazyMatrixSum, X::AbstractMatrix)
 end
 function LinearAlgebra.mul!(y::AbstractVecOrMat, L::LazyMatrixSum, x::AbstractVecOrMat,
                             α::Real = 1, β::Real = 0)
-    @. y = β*y
+    @. y = (iszero(β) ? 0 : β*y)
     for A in L.args
         mul!(y, A, x, α, 1)
     end
     return y
+end
+
+function LinearAlgebra.:\(A::LazyFactorization, b::AbstractVector)
+    T = promote_type(eltype(A), eltype(b))
+    x = zeros(T, size(A, 1))
+    ldiv!(x, A, b)
+end
+# solve general BlockGramian via minimum residual solver
+function LinearAlgebra.ldiv!(x::AbstractVector, A::LazyFactorization, b::AbstractVector; kwargs...)
+    minres!(x, A, b; kwargs...)
 end
 
 # IDEA: more efficient temporary allocation
