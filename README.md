@@ -134,7 +134,7 @@ In contrast, instantiating the matrix is much slower and memory-expensive:
   0.393198 seconds (2 allocations: 2.000 GiB, 0.89% gc time)
 ```
 
-While the fast multiplicatios can be used in conjunction with iterative solvers,
+While the fast multiplications can be used in conjunction with iterative solvers,
 CovarianceFunctions.jl also implements a `O(n²)` direct solver called `levinson`:
 ```julia
 using CovarianceFunctions: levinson
