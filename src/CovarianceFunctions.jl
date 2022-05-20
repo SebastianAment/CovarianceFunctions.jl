@@ -45,6 +45,7 @@ function gramian end
 
 # first, utility functions
 include("util.jl")
+include("givens.jl") # TODO: should be in base, makes givensAlgorithm differentiable
 include("derivatives.jl")
 include("lazy_linear_algebra.jl") # TODO: separate out into package
 include("lazy_grid.jl")
