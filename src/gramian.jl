@@ -232,8 +232,9 @@ function LinearAlgebra.:\(B::BlockGramian, b::AbstractVector)
     ldiv!(x, B, b)
 end
 # solve general BlockGramian via minimum residual solver
+# IDEA: cg instead? is faster for high-dimensional (d>64) gradient kernels
 function LinearAlgebra.ldiv!(x::AbstractVector, B::BlockGramian, b::AbstractVector; kwargs...)
-    minres!(x, B, b; kwargs...)
+    cg!(x, B, b; kwargs...)
 end
 
 # carries out multiplication for general BlockFactorization

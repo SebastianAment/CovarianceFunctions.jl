@@ -16,20 +16,30 @@ function gradient_kernel!(K::LazyMatrixSum, k::Sum, x::AbstractVector, y::Abstra
     return K
 end
 
-function gramian(k::GradientKernel{<:Any, <:Sum}, x::AbstractVector, y::AbstractVector)
+function gramian(k::AbstractDerivativeKernel{<:Any, <:Sum}, x::AbstractVector, y::AbstractVector)
     gramian(k, x, y, input_trait(k))
 end
 
-# this is more efficient for global structure if the constituents are structured (saves allocations)
-function gramian(k::GradientKernel{<:Any, <:Sum}, x::AbstractVector, y::AbstractVector, ::GenericInput)
-    LazyMatrixSum((gramian(GradientKernel(ki), x, y) for ki in k.k.args)...)
-end
-
-# if all constituents have the same structue, use lazy representation
-function gramian(k::GradientKernel{<:Any, <:Sum}, x::AbstractVector, y::AbstractVector, ::InputTrait)
+# if all constituents have the same structue i.e. not GenericInput, use lazy representation
+function gramian(k::AbstractDerivativeKernel{<:Any, <:Sum}, x::AbstractVector, y::AbstractVector, ::InputTrait)
     G = Gramian(k, x, y)
     BlockFactorization(G, isstrided = true)
 end
+
+# if the constituents are structured (saves allocations), this is more efficient for global structure:
+function gramian(k::GradientKernel{<:Any, <:Sum}, x::AbstractVector, y::AbstractVector, ::GenericInput)
+    LazyMatrixSum((gramian(GradientKernel(ki), x, y) for ki in k.k.args)...)
+end
+function gramian(k::ValueGradientKernel{<:Any, <:Sum}, x::AbstractVector, y::AbstractVector, ::GenericInput)
+   LazyMatrixSum((gramian(ValueGradientKernel(ki), x, y) for ki in k.k.args)...)
+end
+# would have to define this after hessian.jl
+# function gramian(k::HessianKernel{<:Any, <:Sum}, x::AbstractVector, y::AbstractVector, ::GenericInput)
+#    LazyMatrixSum((gramian(HessianKernel(ki), x, y) for ki in k.k.args)...)
+# end
+# function gramian(k::ValueGradientHessianKernel{<:Any, <:Sum}, x::AbstractVector, y::AbstractVector, ::GenericInput)
+#    LazyMatrixSum((gramian(ValueGradientHessianKernel(ki), x, y) for ki in k.k.args)...)
+# end
 
 ################################ Product #######################################
 # for product kernel with generic input

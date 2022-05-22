@@ -1,5 +1,5 @@
 # IDEA: GradientLaplacianKernel?
-struct HessianKernel{T, K} <: MultiKernel{T}
+struct HessianKernel{T, K} <: AbstractDerivativeKernel{T, K}
     k::K
     # input_type::IT  IT<:InputTrait
     # could A temporary storage for gradient calculation here
@@ -276,7 +276,7 @@ end
 
 ################################################################################
 # kernel for value, gradient, and Hessian observations
-struct ValueGradientHessianKernel{T, K} <: MultiKernel{T}
+struct ValueGradientHessianKernel{T, K} <: AbstractDerivativeKernel{T, K}
     k::K
     # input_type::IT  IT<:InputTrait
 end
@@ -484,7 +484,6 @@ end
 # #
 # # end
 #
-
 
 # block implementation probably less efficient than the Element one
 # TODO: move to value_gradient_hessian_kernel!

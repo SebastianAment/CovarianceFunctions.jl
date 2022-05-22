@@ -1,8 +1,10 @@
 # implementation of derivative and gradient kernel
 ########################### Gradient kernel ####################################
+abstract type AbstractDerivativeKernel{T, K} <: MultiKernel{T} end
+
 # f ∼ GP(μ, k)
 # ∂f ∼ GP(∂μ, dkxy) # gradient kernel
-struct GradientKernel{T, K, IT<:InputTrait} <: MultiKernel{T}
+struct GradientKernel{T, K, IT<:InputTrait} <: AbstractDerivativeKernel{T, K}
     k::K
     input_trait::IT
     function GradientKernel{T, K}(k, it = input_trait(k)) where {T, K}
@@ -419,7 +421,7 @@ end
 # [f, ∂f] ∼ GP([μ, ∂μ], dK) # value + gradient kernel
 # IDEA: For efficiency, maybe create ValueGradientKernelElement like in hessian.jl
 # currently, this is an order of magnitude slower than GradientKernel
-struct ValueGradientKernel{T, K, IT<:InputTrait} <: MultiKernel{T}
+struct ValueGradientKernel{T, K, IT<:InputTrait} <: AbstractDerivativeKernel{T, K}
     k::K
     input_trait::IT
     function ValueGradientKernel{T, K}(k, it = input_trait(k)) where {T, K}
@@ -516,7 +518,7 @@ end
 function value_gradient_covariance!(gx, gy, k::Sum, x, y, ::GenericInput, α::Real = 1, β::Real = 0)
     @. gx *= β
     @. gy *= β
-    for h in k.args # input_trait(h) should not be called if h is a composite kernel for higher effiency
+    for h in k.args
         value_gradient_covariance!(gx, gy, h, x, y, input_trait(h), α, 1)
     end
     return gx, gy
@@ -567,6 +569,7 @@ end
 
 ################################################################################
 # for 1d inputs
+# can't be AbstractDerivativeKernel since it is not a multi-kernel
 struct DerivativeKernel{T, K} <: AbstractKernel{T}
     k::K
 end
@@ -577,7 +580,7 @@ function (G::DerivativeKernel)(x::Real, y::Real)
 end
 
 ################################################################################
-struct ValueDerivativeKernel{T, K} <: MultiKernel{T}
+struct ValueDerivativeKernel{T, K} <: AbstractDerivativeKernel{T, K}
     k::K
 end
 ValueDerivativeKernel(k) = ValueDerivativeKernel{Float64, typeof(k)}(k)

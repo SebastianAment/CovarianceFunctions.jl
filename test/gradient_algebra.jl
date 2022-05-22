@@ -66,6 +66,7 @@ end
             Gxy_control = G_control(x, y)
             @test typeof(Gxy) != typeof(Gxy_control) # means special structure was discovered
             @test Matrix(Gxy) ≈ Gxy_control
+            @test Matrix(gramian(G, [x, y])) ≈ Matrix(gramian(G_control, [x, y]))
         end
     end
 end

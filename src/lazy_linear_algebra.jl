@@ -138,8 +138,9 @@ function LinearAlgebra.:\(A::LazyFactorization, b::AbstractVector)
     ldiv!(x, A, b)
 end
 # solve general BlockGramian via minimum residual solver
+# NOTE: the implicit assumption here is that we only wrap p.d. matrices with LazyFactorization
 function LinearAlgebra.ldiv!(x::AbstractVector, A::LazyFactorization, b::AbstractVector; kwargs...)
-    minres!(x, A, b; kwargs...)
+    cg!(x, A, b; kwargs...)
 end
 
 # IDEA: more efficient temporary allocation
