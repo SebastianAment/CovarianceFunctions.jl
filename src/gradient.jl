@@ -60,6 +60,19 @@ Base.eltype(K::GradientKernelElement{T}) where T = T
 # gradient kernel element only used for sparsely representable elements
 Base.Matrix(K::GradientKernelElement) = K * I(size(K, 1))
 
+function GradientKernelElement{T}(k, x, y, it::InputTrait) where T
+    GradientKernelElement{T, typeof(k), typeof(x), typeof(y), typeof(it)}(k, x, y, it)
+end
+
+function gradient_kernel(k, x, y, it::InputTrait)
+    T = gramian_eltype(k, x, y)
+    GradientKernelElement{T}(k, x, y, it)
+end
+
+function gradient_kernel!(K::GradientKernelElement, k, x, y, it::InputTrait)
+    GradientKernelElement{eltype(K)}(k, x, y, it)
+end
+
 function Base.:*(G::GradientKernelElement, a)
     T = promote_type(eltype(G), eltype(a))
     b  = zeros(T, size(a))
@@ -67,11 +80,7 @@ function Base.:*(G::GradientKernelElement, a)
 end
 
 const GenericGradientKernelElement{T, K, X, Y} = GradientKernelElement{T, K, X, Y, <:GenericInput}
-
 const IsotropicGradientKernelElement{T, K, X, Y} = GradientKernelElement{T, K, X, Y, IsotropicInput}
-function IsotropicGradientKernelElement{T}(k, x, y) where T
-    IsotropicGradientKernelElement{T, typeof(k), typeof(x), typeof(y)}(k, x, y, IsotropicInput())
-end
 
 # isotropic kernel
 function LinearAlgebra.mul!(b, G::IsotropicGradientKernelElement, a, α::Number = 1, β::Number = 0) #, ::IsotropicInput = G.input_trait)
@@ -95,19 +104,8 @@ function WoodburyFactorizations.Woodbury(K::IsotropicGradientKernelElement)
     return K = Woodbury(D, r, C, r')
 end
 
-function gradient_kernel!(K::IsotropicGradientKernelElement, k, x, y, ::IsotropicInput)
-    typeof(K)(k, x, y, IsotropicInput())
-end
-
-function gradient_kernel(k, x, y, ::IsotropicInput)
-    T = gramian_eltype(k, x, y)
-    IsotropicGradientKernelElement{T}(k, x, y)
-end
-
 const DotProductGradientKernelElement{T, K, X, Y} = GradientKernelElement{T, K, X, Y, DotProductInput}
-function DotProductGradientKernelElement{T}(k, x, y) where T
-    DotProductGradientKernelElement{T, typeof(k), typeof(x), typeof(y)}(k, x, y, DotProductInput())
-end
+
 function LinearAlgebra.mul!(b, K::DotProductGradientKernelElement, a, α::Number = 1, β::Number = 0)
     k, x, y = K.k, K.x, K.y
     d² = dot(x, y)
@@ -126,19 +124,7 @@ function WoodburyFactorizations.Woodbury(K::DotProductGradientKernelElement)
     return K = Woodbury(D, copy(y), C, copy(x)')
 end
 
-function gradient_kernel!(K::DotProductGradientKernelElement, k, x, y, ::DotProductInput)
-    typeof(K)(k, x, y, DotProductInput())
-end
-
-function gradient_kernel(k, x, y, ::DotProductInput)
-    T = gramian_eltype(k, x, y)
-    DotProductGradientKernelElement{T}(k, x, y)
-end
-
 const LinearFunctionalGradientKernelElement{T, K, X, Y} = GradientKernelElement{T, K, X, Y, StationaryLinearFunctionalInput}
-function LinearFunctionalGradientKernelElement{T}(k, x, y) where T
-    LinearFunctionalGradientKernelElement{T, typeof(k), typeof(x), typeof(y)}(k, x, y, StationaryLinearFunctionalInput())
-end
 
 function LinearAlgebra.mul!(b, K::LinearFunctionalGradientKernelElement, a, α::Number = 1, β::Number = 0)
     k, x, y = K.k, K.x, K.y
@@ -160,16 +146,6 @@ function LazyMatrixProduct(K::LinearFunctionalGradientKernelElement)
     @. c = k.c
     c2 = -k2*c
     return LazyMatrixProduct(c, c2')
-end
-
-# is this necessary?
-function gradient_kernel!(K::LinearFunctionalGradientKernelElement, k, x, y, ::StationaryLinearFunctionalInput)
-    typeof(K)(k, x, y, StationaryLinearFunctionalInput())
-end
-
-function gradient_kernel(k, x, y, ::StationaryLinearFunctionalInput)
-    T = gramian_eltype(k, x, y)
-    LinearFunctionalGradientKernelElement{T}(k, x, y)
 end
 
 function evaluate_block!(Gij, k::GradientKernel, x, y, IT = input_trait(k))
@@ -420,7 +396,7 @@ end
 ################################################################################
 # [f, ∂f] ∼ GP([μ, ∂μ], dK) # value + gradient kernel
 # IDEA: For efficiency, maybe create ValueGradientKernelElement like in hessian.jl
-# currently, this is an order of magnitude slower than GradientKernel
+# might not be necessary anymore, benchmark against GradientKernel
 struct ValueGradientKernel{T, K, IT<:InputTrait} <: AbstractDerivativeKernel{T, K}
     k::K
     input_trait::IT

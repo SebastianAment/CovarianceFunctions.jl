@@ -1,4 +1,5 @@
 ############################ Gradient Algebra ##################################
+# IDEA: could have specialization for gradient kernels of Power kernels of composite kernels
 ################################### Sum ########################################
 # allocates space for gradient kernel evaluation but does not evaluate
 # the separation from evaluation is useful for ValueGradientKernel
