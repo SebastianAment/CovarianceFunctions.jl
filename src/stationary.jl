@@ -38,7 +38,8 @@ struct ExponentiatedQuadratic{T} <: IsotropicKernel{T} end
 const EQ{T} = ExponentiatedQuadratic{T}
 @functor EQ
 EQ() = EQ{Union{}}() # defaults to "bottom" type since it doesn't have any parameters
-(k::EQ)(r²::Number) = exp(-r²/2)
+
+(k::EQ)(r²::Number) = exp(-r² / 2)
 
 ########################## rational quadratic kernel ###########################
 struct RationalQuadratic{T} <: IsotropicKernel{T}
