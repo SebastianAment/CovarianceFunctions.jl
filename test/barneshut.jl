@@ -1,12 +1,14 @@
 module TestBarnesHut
 using LinearAlgebra
+using WoodburyFactorizations
 using CovarianceFunctions
 using CovarianceFunctions: BarnesHutFactorization, barneshut!, vector_of_static_vectors,
-        node_sums, euclidean, GradientKernel, taylor!
+        node_sums, euclidean, GradientKernel, taylor!, IsotropicGradientKernelElement
 using NearestNeighbors
 using NearestNeighbors: isleaf, getleft, getright, get_leaf_range
 using Test
 
+# like barnes hut but puts 0 as far field contribution
 function barneshut_no_far_field!(b::AbstractVector, F::BarnesHutFactorization, w::AbstractVector,
                     α::Number = 1, β::Number = 0, θ::Real = F.θ)
     D = length(eltype(F.x))
@@ -95,10 +97,9 @@ verbose = false
         nexp = 16
         err = zeros(nexp)
         err_no_split = zeros(nexp)
-        err_hyp = zeros(nexp)
-        err_hyp_no_split = zeros(nexp)
         err_nff = zeros(nexp)
         err_taylor = zeros(nexp)
+        err_taylor_hyp = zeros(nexp)
         theta_array = range(1e-1, 1, length = nexp)
         for (i, θ) in enumerate(theta_array)
             barneshut!(b_bh, F, w, 1, 0, θ, split = true)
@@ -110,8 +111,11 @@ verbose = false
             barneshut_no_far_field!(b_bh, F, w, 1, 0, θ) # compare against pseudo barnes hut where far field = 0
             err_nff[i] = norm(b - b_bh)
 
-            taylor!(b_bh, F, w, 1, 0, θ) # compare against pseudo barnes hut where far field = 0
+            taylor!(b_bh, F, w, 1, 0, θ, use_com = true)
             err_taylor[i] = norm(b - b_bh)
+
+            taylor!(b_bh, F, w, 1, 0, θ, use_com = false)
+            err_taylor_hyp[i] = norm(b - b_bh)
         end
 
         rel_err = err / norm(b)
@@ -122,29 +126,59 @@ verbose = false
         # using Plots
         # plotly()
         #
-        # rel_err_nff = err_nff / norm(b)
-        # rel_err_no_split = err_no_split / norm(b)
-        # rel_err_taylor = err_taylor / norm(b)
-        #
+        # norm_b = norm(b)
+        # rel_err_nff = err_nff / norm_b
+        # rel_err_no_split = err_no_split / norm_b
+        # rel_err_taylor = err_taylor / norm_b
+        # rel_err_taylor_hyp = err_taylor_hyp / norm_b
+        # #
         # plot(theta_array, rel_err, yscale = :log10, label = "barneshut", ylabel = "relative error", xlabel = "θ")
         # plot!(theta_array, rel_err_no_split, yscale = :log10, label = "no split")
         # plot!(theta_array, rel_err_nff, yscale = :log10, label = "sparse")
         # plot!(theta_array, rel_err_taylor, yscale = :log10, label = "taylor")
+        # plot!(theta_array, rel_err_taylor_hyp, yscale = :log10, label = "taylor hyper-sphere centers")
         # gui()
 
     end # testset weight vectors
 
+    @testset "gradient kernels" begin
 
-    # @testset "gradient kernels" begin
-    #     k = CovarianceFunctions.Cauchy()
-    #     g = CovarianceFunctions.GradientKernel(k)
-    #
-    #     F = BarnesHutFactorization(g, x)
-    #     @test F isa BarnesHutFactorization
-    #     @test eltype(F) <: Diagonal
-    #     @test size(F) == (n, n)
-    #     @test size(F[1, 1]) == (d_out, d_out)
-    # end # testset matrix valued bh
+        n = 1024
+        d = 2
+        x = randn(d, n)
+        # k = CovarianceFunctions.Cauchy()
+        k = CovarianceFunctions.EQ()
+        g = CovarianceFunctions.GradientKernel(k)
+
+        F = BarnesHutFactorization(g, x)
+        @test F isa BarnesHutFactorization
+        @test eltype(F) <: IsotropicGradientKernelElement
+        @test size(F) == (n, n)
+        @test size(F[1, 1]) == (d, d)
+
+        a = [randn(d) for _ in 1:n]
+        b = [zeros(d) for _ in 1:n]
+        # F*a
+        G = gramian(g, x)
+        b_truth = deepcopy(b)
+        # @time b_truth = G.A * a
+        # @time b_truth = G.A * a
+        mul!(b_truth, G.A, a)
+        norm_b = sqrt(sum(sum.(abs2, b_truth)))
+
+        α, β = 1, 0
+        θ = 0
+        taylor!(b, F, a, α, β, θ)
+        err = sqrt(sum(sum.(abs2, b - b_truth)))
+        rel_err = err / norm_b
+        @test rel_err < 1e-10
+
+        θ = 1/10
+        taylor!(b, F, a, α, β, θ)
+        err = sqrt(sum(sum.(abs2, b - b_truth)))
+        rel_err = err / norm_b
+        @test rel_err < 1e-3
+    end # testset matrix valued bh
 
 end # testset
 

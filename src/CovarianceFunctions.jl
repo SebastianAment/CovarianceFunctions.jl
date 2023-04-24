@@ -67,7 +67,7 @@ include("taylor.jl")
 include("gradient.jl")
 include("gradient_algebra.jl")
 include("hessian.jl")
-# include("taylor_gradient.jl") # fast MVM algorithm for isotropic GradientKernel Gramians
+include("taylor_gradient.jl") # fast MVM algorithm for isotropic GradientKernel Gramians
 include("separable.jl")
 
 end # CovarianceFunctions
