@@ -27,7 +27,7 @@ ToeplitzMatrices = "c751599d-da0a-543b-9d20-d0a503d91d24"
 WoodburyFactorizations = "9f1bac23-581c-4ebc-bd36-df60d764636d"
 
 [compat]
-BesselK = "0.3"
+BesselK = "0.3, 0.4"
 BlockFactorizations = "1.2.1"
 DiffResults = "1.0"
 FFTW = "1"
